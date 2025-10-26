@@ -698,10 +698,10 @@ void Game::Initialize() {
 	ebDefense->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 
 	// Genesys
-	stGenesys = env->addStaticText(L"", Scale(205, 51, 280, 71), false, false, wFilter);
+	stGenesys = env->addStaticText(L"", Scale(205, 51, 298, 71), false, false, wFilter);
 	defaultStrings.emplace_back(stGenesys, 4502);
 
-	ebGenesys = AlignElementWithParent(env->addEditBox(L"", Scale(260, 49, 340, 69), true, wFilter, EDITBOX_GENESYS));
+	ebGenesys = AlignElementWithParent(env->addEditBox(L"", Scale(300, 49, 340, 69), true, wFilter, EDITBOX_GENESYS));
 	ebGenesys->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 
 	// Level
@@ -3696,7 +3696,7 @@ void Game::OnResize() {
 	stRace->setRelativePosition(ResizeWin(10, 51, 70, 71));
 	stAttack->setRelativePosition(ResizeWin(205, 28, 280, 48));
 	//stDefense->setRelativePosition(ResizeWin(205, 51, 280, 71));
-	stGenesys->setRelativePosition(ResizeWin(205, 51, 280, 71));
+	stGenesys->setRelativePosition(ResizeWin(205, 51, 298, 71));
 	stStar->setRelativePosition(ResizeWin(10, 74, 80, 94));
 	stSearch->setRelativePosition(ResizeWin(205, 74, 280, 94));
 	stScale->setRelativePosition(ResizeWin(110, 74, 150, 94));

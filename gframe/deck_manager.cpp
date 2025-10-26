@@ -34,7 +34,7 @@ void DeckManager::ClearDummies() {
 }
 bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 	static constexpr auto key = "$whitelist"sv;
-	static constexpr auto genesys_key = "genesys"sv;
+	static constexpr auto genesys_key = "$genesys"sv;
 
 	FileStream infile{ path, FileStream::in };
 	if(infile.fail())
@@ -71,7 +71,6 @@ bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 		// Determine if lflist is a point-list for Genesys format
 		if (str.rfind(genesys_key.data(), 0, genesys_key.size()) == 0) {
 			try {
-				// Find position of space after the key, extract the substring after it and convert it to an integer
 				auto p = str.find(' ');
 				if (p != std::string::npos) {
 					lflist.genesys_threshold = std::stoi(str.substr(p + 1));

@@ -473,6 +473,7 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 			case EDITBOX_DEFENSE:
 			case EDITBOX_STAR:
 			case EDITBOX_SCALE:
+			case EDITBOX_GENESYS:
 			case EDITBOX_KEYWORD: {
 				StartFilter();
 				break;
@@ -495,6 +496,7 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 				break;
 			}
 			case EDITBOX_STAR:
+			case EDITBOX_GENESYS:
 			case EDITBOX_SCALE: {
 				StartFilter();
 				break;
@@ -1049,6 +1051,7 @@ void DeckBuilder::StartFilter(bool force_refresh) {
 	filter_type = mainGame->cbCardType->getSelected();
 	filter_type2 = mainGame->cbCardType2->getItemData(mainGame->cbCardType2->getSelected());
 	filter_lm = static_cast<limitation_search_filters>(mainGame->cbLimit->getItemData(mainGame->cbLimit->getSelected()));
+	filter_genesys = parse_filter(mainGame->ebGenesys->getText(), filter_genesystype);
 	if(filter_type == 1) {
 		filter_attrib = mainGame->cbAttribute->getItemData(mainGame->cbAttribute->getSelected());
 		auto selected = mainGame->cbRace->getItemData(mainGame->cbRace->getSelected());
@@ -1060,7 +1063,6 @@ void DeckBuilder::StartFilter(bool force_refresh) {
 		filter_def = parse_filter(mainGame->ebDefense->getText(), filter_deftype);
 		filter_lv = parse_filter(mainGame->ebStar->getText(), filter_lvtype);
 		filter_scl = parse_filter(mainGame->ebScale->getText(), filter_scltype);
-		filter_genesys = parse_filter(mainGame->ebGenesys->getText(), filter_genesystype);
 	}
 	FilterCards(force_refresh);
 	GetHoveredCard();
@@ -1182,85 +1184,93 @@ void DeckBuilder::FilterCards(bool force_refresh) {
 bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 	if(data._data.type & TYPE_TOKEN || data._data.ot & SCOPE_HIDDEN || ((data._data.ot & SCOPE_OFFICIAL) != data._data.ot && (!mainGame->chkAnime->isChecked() && !filterList->whitelist)))
 		return false;
+
 	switch(filter_type) {
-	case 1: {
-		if(!(data._data.type & TYPE_MONSTER) || (data._data.type & filter_type2) != filter_type2)
-			return false;
-		if(filter_race && data._data.race != filter_race)
-			return false;
-		if(filter_attrib && data._data.attribute != filter_attrib)
-			return false;
-		if(filter_atktype) {
-			if((filter_atktype == 1 && data._data.attack != filter_atk) || (filter_atktype == 2 && data._data.attack < filter_atk)
-				|| (filter_atktype == 3 && data._data.attack <= filter_atk) || (filter_atktype == 4 && (data._data.attack > filter_atk || data._data.attack < 0))
-				|| (filter_atktype == 5 && (data._data.attack >= filter_atk || data._data.attack < 0)) || (filter_atktype == 6 && data._data.attack != -2))
+		case 1: {
+			if(!(data._data.type & TYPE_MONSTER) || (data._data.type & filter_type2) != filter_type2)
 				return false;
-		}
-		if(filter_deftype) {
-			if((filter_deftype == 1 && data._data.defense != filter_def) || (filter_deftype == 2 && data._data.defense < filter_def)
-				|| (filter_deftype == 3 && data._data.defense <= filter_def) || (filter_deftype == 4 && (data._data.defense > filter_def || data._data.defense < 0))
-				|| (filter_deftype == 5 && (data._data.defense >= filter_def || data._data.defense < 0)) || (filter_deftype == 6 && data._data.defense != -2)
-				|| (data._data.type & TYPE_LINK))
+			if(filter_race && data._data.race != filter_race)
 				return false;
-		}
-		if(filter_lvtype) {
-			if((filter_lvtype == 1 && data._data.level != filter_lv) || (filter_lvtype == 2 && data._data.level < filter_lv)
-				|| (filter_lvtype == 3 && data._data.level <= filter_lv) || (filter_lvtype == 4 && data._data.level > filter_lv)
-				|| (filter_lvtype == 5 && data._data.level >= filter_lv) || filter_lvtype == 6)
+			if(filter_attrib && data._data.attribute != filter_attrib)
 				return false;
+			if(filter_atktype) {
+				if((filter_atktype == 1 && data._data.attack != filter_atk) || (filter_atktype == 2 && data._data.attack < filter_atk)
+					|| (filter_atktype == 3 && data._data.attack <= filter_atk) || (filter_atktype == 4 && (data._data.attack > filter_atk || data._data.attack < 0))
+					|| (filter_atktype == 5 && (data._data.attack >= filter_atk || data._data.attack < 0)) || (filter_atktype == 6 && data._data.attack != -2))
+					return false;
+			}
+			if(filter_deftype) {
+				if((filter_deftype == 1 && data._data.defense != filter_def) || (filter_deftype == 2 && data._data.defense < filter_def)
+					|| (filter_deftype == 3 && data._data.defense <= filter_def) || (filter_deftype == 4 && (data._data.defense > filter_def || data._data.defense < 0))
+					|| (filter_deftype == 5 && (data._data.defense >= filter_def || data._data.defense < 0)) || (filter_deftype == 6 && data._data.defense != -2)
+					|| (data._data.type & TYPE_LINK))
+					return false;
+			}
+			if(filter_lvtype) {
+				if((filter_lvtype == 1 && data._data.level != filter_lv) || (filter_lvtype == 2 && data._data.level < filter_lv)
+					|| (filter_lvtype == 3 && data._data.level <= filter_lv) || (filter_lvtype == 4 && data._data.level > filter_lv)
+					|| (filter_lvtype == 5 && data._data.level >= filter_lv) || filter_lvtype == 6)
+					return false;
+			}
+			if(filter_scltype) {
+				if((filter_scltype == 1 && data._data.lscale != filter_scl) || (filter_scltype == 2 && data._data.lscale < filter_scl)
+					|| (filter_scltype == 3 && data._data.lscale <= filter_scl) || (filter_scltype == 4 && (data._data.lscale > filter_scl))
+					|| (filter_scltype == 5 && (data._data.lscale >= filter_scl)) || filter_scltype == 6
+					|| !(data._data.type & TYPE_PENDULUM))
+					return false;
+			}
+			break;
 		}
-		if(filter_scltype) {
-			if((filter_scltype == 1 && data._data.lscale != filter_scl) || (filter_scltype == 2 && data._data.lscale < filter_scl)
-				|| (filter_scltype == 3 && data._data.lscale <= filter_scl) || (filter_scltype == 4 && (data._data.lscale > filter_scl))
-				|| (filter_scltype == 5 && (data._data.lscale >= filter_scl)) || filter_scltype == 6
-				|| !(data._data.type & TYPE_PENDULUM))
+		case 2: {
+			if(!(data._data.type & TYPE_SPELL))
 				return false;
+			if(filter_type2 && data._data.type != filter_type2)
+				return false;
+			break;
 		}
-		break;
-	}
-	case 2: {
-		if(!(data._data.type & TYPE_SPELL))
-			return false;
-		if(filter_type2 && data._data.type != filter_type2)
-			return false;
-		break;
-	}
-	case 3: {
-		if(!(data._data.type & TYPE_TRAP))
-			return false;
-		if(filter_type2 && data._data.type != filter_type2)
-			return false;
-		break;
-	}
-	case 4: {
-		if(!(data._data.type & TYPE_SKILL))
-			return false;
-		break;
-	}
+		case 3: {
+			if(!(data._data.type & TYPE_TRAP))
+				return false;
+			if(filter_type2 && data._data.type != filter_type2)
+				return false;
+			break;
+		}
+		case 4: {
+			if(!(data._data.type & TYPE_SKILL))
+				return false;
+			break;
+		}
 	}
 	if(filter_effect && !(data._data.category & filter_effect))
 		return false;
 	if(filter_marks && (data._data.link_marker & filter_marks) != filter_marks)
 		return false;
-	if((filter_lm != LIMITATION_FILTER_NONE || filterList->whitelist) && filter_lm != LIMITATION_FILTER_ALL) {
+
+	if (filterList->genesys_threshold >= 0) {
+		auto flit = filterList->GetLimitationIterator(&data._data);
+		int count = 0;
+		if (flit != filterList->content.end()) {
+			count = flit->second;
+		}
+
+		if (filter_genesystype) {
+			if ((filter_genesystype == 1 && count != filter_genesys) || (filter_genesystype == 2 && count < filter_genesys)
+				|| (filter_genesystype == 3 && count <= filter_genesys) || (filter_genesystype == 4 && (count > filter_genesys))
+				|| (filter_genesystype == 5 && (count >= filter_genesys)) || filter_lvtype == 6)
+				return false;
+		}
+	}
+	else if ((filter_lm != LIMITATION_FILTER_NONE || filterList->whitelist) && filter_lm != LIMITATION_FILTER_ALL) {
 		auto flit = filterList->GetLimitationIterator(&data._data);
 		int count = 3;
-		if(flit == filterList->content.end()) {
-			if(filterList->whitelist)
+		if (flit == filterList->content.end()) {
+			if (filterList->whitelist)
 				count = -1;
-		} else
+		}
+		else
 			count = flit->second;
 
-		if (filterList->genesys_threshold >= 0) {
-			if (filter_genesystype) {
-				if ((filter_genesystype == 1 && count != filter_genesys) || (filter_genesystype == 2 && count < filter_genesys)
-					|| (filter_genesystype == 3 && count <= filter_genesys) || (filter_genesystype == 4 && (count > filter_genesys || count < 0))
-					|| (filter_genesystype == 5 && (count >= filter_genesys || count < 0)) )
-					return false;
-			}
-		}
-		else {
-			switch (filter_lm) {
+		switch (filter_lm) {
 			case LIMITATION_FILTER_BANNED:
 			case LIMITATION_FILTER_LIMITED:
 			case LIMITATION_FILTER_SEMI_LIMITED:
@@ -1317,13 +1327,13 @@ bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 				break;
 			default:
 				break;
-			}
 		}
 
-		
-		if(filterList->whitelist && count < 0)
+
+		if (filterList->whitelist && count < 0)
 			return false;
 	}
+
 	return true;
 }
 static const auto& CardSetcodes(const CardDataC& data) {
@@ -1370,6 +1380,7 @@ void DeckBuilder::ClearSearch() {
 	mainGame->cbAttribute->setEnabled(false);
 	mainGame->ebAttack->setEnabled(false);
 	mainGame->ebDefense->setEnabled(false);
+	mainGame->ebGenesys->setText(L"");
 	mainGame->ebStar->setEnabled(false);
 	mainGame->ebScale->setEnabled(false);
 	mainGame->ebCardName->setText(L"");

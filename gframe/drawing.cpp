@@ -1187,15 +1187,19 @@ void Game::WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck) {
  * @param number The integer to draw.
  * @param position The center position for the entire number.
  * @param fontTexture The texture containing the digit atlas (horizontal strip).
- * @param digitSize The dimensions of a single digit within the atlas.
+ * @param originalDigitSize The dimensions of a single digit in the source atlas.
+ * @param scaledDigitHeight The target height for the rendered digits on screen.
  * @param cliprect Optional clipping rectangle.
  */
 void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position,
-	irr::video::ITexture* fontTexture, const irr::core::dimension2du& digitSize, const irr::core::recti* cliprect) {
+	irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float scaledDigitHeight, const irr::core::recti* cliprect) {
 
-	if (!fontTexture || number <= 0) {
+	if (!fontTexture || number <= 0 || originalDigitSize.Height == 0) {
 		return;
 	}
+
+	float scale = scaledDigitHeight / static_cast<float>(originalDigitSize.Height);
+	float scaledDigitWidth = static_cast<float>(originalDigitSize.Width) * scale;
 
 	std::string numStr = std::to_string(number);
 	int numDigits = numStr.length();
@@ -1203,19 +1207,21 @@ void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& posi
 		return;
 	}
 
-	int totalWidth = numDigits * digitSize.Width;
+	int totalWidth = numDigits * scaledDigitWidth;
 
 	irr::core::vector2di currentPos;
-	currentPos.X = position.X - totalWidth / 2;
-	currentPos.Y = position.Y - digitSize.Height / 2;
+	currentPos.X = static_cast<irr::s32>(position.X - totalWidth / 2.0f);
+	currentPos.Y = static_cast<irr::s32>(position.Y - scaledDigitHeight / 2.0f);
 
 	for (char const& c : numStr) {
 		int digit = c - '0';
 
-		irr::core::recti sourceRect(digit * digitSize.Width, 0, (digit + 1) * digitSize.Width, digitSize.Height);
-		irr::core::recti destRect(currentPos.X, currentPos.Y, currentPos.X + digitSize.Width, currentPos.Y + digitSize.Height);
+		irr::core::recti sourceRect(digit * originalDigitSize.Width, 0, (digit + 1) * originalDigitSize.Width, originalDigitSize.Height);
+		irr::core::recti destRect(currentPos.X, currentPos.Y, static_cast<irr::s32>(currentPos.X + scaledDigitWidth),
+			static_cast<irr::s32>(currentPos.Y + scaledDigitHeight));
 		driver->draw2DImage(fontTexture, destRect, sourceRect, cliprect, 0, true);
-		currentPos.X += digitSize.Width;
+
+		currentPos.X += static_cast<irr::s32>(scaledDigitWidth);
 	}
 }
 
@@ -1223,7 +1229,7 @@ void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& posi
 void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag, const irr::core::recti* cliprect, bool load_image) {
 	auto code = cp->code;
 	auto flit = lflist->GetLimitationIterator(cp);
-	int count = 3;
+	int count = lflist->genesys_threshold >=0 ? 0 : 3;
 	if(flit == lflist->content.end()) {
 		if(lflist->whitelist)
 			count = -1;
@@ -1251,10 +1257,11 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 				imageManager.draw2DImageFilterScaled(digitbg, limitloc, irr::core::recti(0, 0, digitbg->getOriginalSize().Width, digitbg->getOriginalSize().Height), cliprect, 0, true);
 
 				irr::video::ITexture* digitstrip = imageManager.tDigits;
-				const irr::core::dimension2du digitSize(digitstrip->getOriginalSize().Width / 10, digitstrip->getOriginalSize().Height);
+				const irr::core::dimension2du originalDigitSize(digitstrip->getOriginalSize().Width / 10, digitstrip->getOriginalSize().Height);
 				irr::core::vector2di center = limitloc.getCenter();
 
-				DrawNumberWithBitmapFont(display_count, center, imageManager.tDigits, digitSize, cliprect);
+				DrawNumberWithBitmapFont(display_count, center, digitstrip, originalDigitSize,
+					static_cast<float>(limitloc.getHeight() - limitloc.getHeight() * 0.45), cliprect);
 			}
 		}
 		else {
