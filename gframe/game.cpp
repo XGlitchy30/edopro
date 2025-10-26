@@ -687,14 +687,24 @@ void Game::Initialize() {
 	cbRace = AlignElementWithParent(AddComboBox(env, Scale(60, 49, 190, 69), wFilter, COMBOBOX_OTHER_FILT));
 	cbRace->setMaxSelectionRows(10);
 	ReloadCBRace();
-	stAttack = env->addStaticText(gDataManager->GetSysString(1322).data(), Scale(205, 28, 280, 48), false, false, wFilter);
-	defaultStrings.emplace_back(stAttack, 1322);
-	ebAttack = AlignElementWithParent(env->addEditBox(L"", Scale(260, 26, 340, 46), true, wFilter, EDITBOX_ATTACK));
+
+	// ATK & DEF
+	stAttack = env->addStaticText(gDataManager->GetSysString(4501).data(), Scale(205, 28, 280, 48), false, false, wFilter);
+	defaultStrings.emplace_back(stAttack, 4501);
+	ebAttack = AlignElementWithParent(env->addEditBox(L"", Scale(260, 26, 298, 46), true, wFilter, EDITBOX_ATTACK));
 	ebAttack->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
-	stDefense = env->addStaticText(gDataManager->GetSysString(1323).data(), Scale(205, 51, 280, 71), false, false, wFilter);
-	defaultStrings.emplace_back(stDefense, 1323);
-	ebDefense = AlignElementWithParent(env->addEditBox(L"", Scale(260, 49, 340, 69), true, wFilter, EDITBOX_DEFENSE));
+
+	ebDefense = AlignElementWithParent(env->addEditBox(L"", Scale(302, 26, 340, 46), true, wFilter, EDITBOX_DEFENSE));
 	ebDefense->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+
+	// Genesys
+	stGenesys = env->addStaticText(L"", Scale(205, 51, 280, 71), false, false, wFilter);
+	defaultStrings.emplace_back(stGenesys, 4502);
+
+	ebGenesys = AlignElementWithParent(env->addEditBox(L"", Scale(260, 49, 340, 69), true, wFilter, EDITBOX_GENESYS));
+	ebGenesys->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+
+	// Level
 	stStar = env->addStaticText(gDataManager->GetSysString(1324).data(), Scale(10, 74, 80, 94), false, false, wFilter);
 	defaultStrings.emplace_back(stStar, 1324);
 	ebStar = AlignElementWithParent(env->addEditBox(L"", Scale(60, 72, 100, 92), true, wFilter, EDITBOX_STAR));
@@ -3444,6 +3454,8 @@ void Game::ReloadCBCardType2() {
 		break;
 	}
 }
+
+// Add the banlist limitation options in the dropdown menus
 void Game::ReloadCBLimit() {
 	bool white = deckBuilder.filterList && deckBuilder.filterList->whitelist;
 	cbLimit->clear();
@@ -3683,7 +3695,8 @@ void Game::OnResize() {
 	stAttribute->setRelativePosition(ResizeWin(10, 28, 70, 48));
 	stRace->setRelativePosition(ResizeWin(10, 51, 70, 71));
 	stAttack->setRelativePosition(ResizeWin(205, 28, 280, 48));
-	stDefense->setRelativePosition(ResizeWin(205, 51, 280, 71));
+	//stDefense->setRelativePosition(ResizeWin(205, 51, 280, 71));
+	stGenesys->setRelativePosition(ResizeWin(205, 51, 280, 71));
 	stStar->setRelativePosition(ResizeWin(10, 74, 80, 94));
 	stSearch->setRelativePosition(ResizeWin(205, 74, 280, 94));
 	stScale->setRelativePosition(ResizeWin(110, 74, 150, 94));

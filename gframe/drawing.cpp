@@ -1179,6 +1179,47 @@ void Game::WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck) {
 	signalFrame = (gGameConfig->quick_animation && frame >= 12) ? 12 * 1000 / 60 : frame * 1000 / 60;
 	frameSignal.Wait(_lck);
 }
+
+// --- Place this function in an appropriate utility class or within the Game class ---
+
+/**
+ * @brief Draws a number using a bitmap font texture atlas.
+ * @param number The integer to draw.
+ * @param position The center position for the entire number.
+ * @param fontTexture The texture containing the digit atlas (horizontal strip).
+ * @param digitSize The dimensions of a single digit within the atlas.
+ * @param cliprect Optional clipping rectangle.
+ */
+void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position,
+	irr::video::ITexture* fontTexture, const irr::core::dimension2du& digitSize, const irr::core::recti* cliprect) {
+
+	if (!fontTexture || number <= 0) {
+		return;
+	}
+
+	std::string numStr = std::to_string(number);
+	int numDigits = numStr.length();
+	if (numDigits == 0) {
+		return;
+	}
+
+	int totalWidth = numDigits * digitSize.Width;
+
+	irr::core::vector2di currentPos;
+	currentPos.X = position.X - totalWidth / 2;
+	currentPos.Y = position.Y - digitSize.Height / 2;
+
+	for (char const& c : numStr) {
+		int digit = c - '0';
+
+		irr::core::recti sourceRect(digit * digitSize.Width, 0, (digit + 1) * digitSize.Width, digitSize.Height);
+		irr::core::recti destRect(currentPos.X, currentPos.Y, currentPos.X + digitSize.Width, currentPos.Y + digitSize.Height);
+		driver->draw2DImage(fontTexture, destRect, sourceRect, cliprect, 0, true);
+		currentPos.X += digitSize.Width;
+	}
+}
+
+// Draws the card's thumbnail image, along with the Banned/Limited/Semi-Limited circular icon and the Scope Label
 void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag, const irr::core::recti* cliprect, bool load_image) {
 	auto code = cp->code;
 	auto flit = lflist->GetLimitationIterator(cp);
@@ -1202,7 +1243,22 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 	}
 	driver->draw2DImage(img, dragloc, irr::core::recti(0, 0, size.Width, size.Height), cliprect);
 	if(!is_siding) {
-		switch(count) {
+
+		if (lflist->genesys_threshold >= 0) {
+			if (count > 0) {
+				int display_count = std::min(count, 1000);
+				irr::video::ITexture* digitbg = imageManager.tDigitBackground;
+				imageManager.draw2DImageFilterScaled(digitbg, limitloc, irr::core::recti(0, 0, digitbg->getOriginalSize().Width, digitbg->getOriginalSize().Height), cliprect, 0, true);
+
+				irr::video::ITexture* digitstrip = imageManager.tDigits;
+				const irr::core::dimension2du digitSize(digitstrip->getOriginalSize().Width / 10, digitstrip->getOriginalSize().Height);
+				irr::core::vector2di center = limitloc.getCenter();
+
+				DrawNumberWithBitmapFont(display_count, center, imageManager.tDigits, digitSize, cliprect);
+			}
+		}
+		else {
+			switch (count) {
 			case -1:
 			case 0:
 				imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(0, 0, 64, 64), cliprect, 0, true);
@@ -1214,11 +1270,13 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 				imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(0, 64, 64, 128), cliprect, 0, true);
 				break;
 			default:
-				if(cp->ot & SCOPE_LEGEND) {
+				if (cp->ot & SCOPE_LEGEND) {
 					imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(64, 64, 128, 128), cliprect, 0, true);
 				}
 				break;
+			}
 		}
+	
 #define IDX(scope,idx) case SCOPE_##scope:\
 							index = idx;\
 							goto draw;
@@ -1266,10 +1324,11 @@ void Game::DrawDeckBd() {
 		const auto main_deck_size_str = GetDeckSizeStr(current_deck.main, gdeckManager->pre_deck.main);
 		DrawShadowText(numFont, main_deck_size_str, Resize(379, 137, 439, 157), Resize(1, 1, 1, 1), 0xffffffff, 0xff000000, false, true);
 
-		const auto main_types_count_str = epro::format(L"{} {} {} {} {} {}",
-													  gDataManager->GetSysString(1312), deckBuilder.main_monster_count,
-													  gDataManager->GetSysString(1313), deckBuilder.main_spell_count,
-													  gDataManager->GetSysString(1314), deckBuilder.main_trap_count);
+		const auto main_types_count_str = epro::format(L"{} {} {} {} {} {} {} {}",
+			gDataManager->GetSysString(1312), deckBuilder.main_monster_count,
+			gDataManager->GetSysString(1313), deckBuilder.main_spell_count,
+			gDataManager->GetSysString(1314), deckBuilder.main_trap_count,
+			gDataManager->GetSysString(4500), deckBuilder.genesys_count);
 
 		const auto mainpos = Resize(310, 137, 797, 157);
 		const auto mainDeckTypeSize = textFont->getDimensionustring(main_types_count_str);

@@ -147,6 +147,14 @@ bool ImageManager::Initial() {
 	ASSERT_TEXTURE_LOADED(tLim, "lim");
 	ASSIGN_DEFAULT(tLim);
 
+	tDigits = loadTextureAnySize(EPRO_TEXT("digits"sv));
+	ASSERT_TEXTURE_LOADED(tDigits, "digits");
+	ASSIGN_DEFAULT(tDigits);
+
+	tDigitBackground = loadTextureAnySize(EPRO_TEXT("digitbg"sv));
+	ASSERT_TEXTURE_LOADED(tDigitBackground, "digitbg");
+	ASSIGN_DEFAULT(tDigitBackground);
+
 	tOT = loadTextureAnySize(EPRO_TEXT("ot"sv));
 	ASSERT_TEXTURE_LOADED(tOT, "ot");
 	ASSIGN_DEFAULT(tOT);
@@ -303,6 +311,8 @@ void ImageManager::ChangeTextures(epro::path_stringview _path) {
 	REPLACE_TEXTURE_ANY_SIZE(tTarget, "target");
 	REPLACE_TEXTURE_ANY_SIZE(tChainTarget, "chaintarget");
 	REPLACE_TEXTURE_ANY_SIZE(tLim, "lim");
+	REPLACE_TEXTURE_ANY_SIZE(tDigits, "digits");
+	REPLACE_TEXTURE_ANY_SIZE(tDigitBackground, "digitbg");
 	REPLACE_TEXTURE_ANY_SIZE(tOT, "ot");
 	REPLACE_TEXTURE_WITH_FIXED_SIZE(tHand[0], "f1", 89, 128);
 	REPLACE_TEXTURE_WITH_FIXED_SIZE(tHand[1], "f2", 89, 128);

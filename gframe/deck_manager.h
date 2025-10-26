@@ -15,11 +15,13 @@ namespace ygo {
 using banlist_content_t = std::unordered_map<uint32_t, int>;
 using cardlist_type = std::vector<uint32_t>;
 
+// Banlist files struct (genesys_threshold is -1 by default)
 struct LFList {
 	uint32_t hash;
 	std::wstring listName;
 	banlist_content_t content;
 	bool whitelist;
+	int genesys_threshold;
 	auto GetLimitationIterator(const CardDataC* pcard) const {
 		auto flit = content.find(pcard->code);
 		if(flit == content.end() && pcard->alias) {
@@ -74,6 +76,7 @@ public:
 	static DeckError CheckDeckSize(const Deck& deck, const DeckSizes& sizes);
 	static int TypeCount(const Deck::Vector& cards, uint32_t type);
 	static int CountLegends(const Deck::Vector& cards, uint32_t type);
+	static int GenesysCount(const Deck::Vector& cards, LFList const* lflist);
 	static uint32_t LoadDeckFromBuffer(Deck& deck, uint32_t* dbuf, uint32_t mainc, uint32_t sidec, RITUAL_LOCATION rituals_in_extra = RITUAL_LOCATION::DEFAULT);
 	static uint32_t LoadDeck(Deck& deck, const cardlist_type& mainlist, const cardlist_type& sidelist, const cardlist_type* extralist = nullptr, RITUAL_LOCATION rituals_in_extra = RITUAL_LOCATION::DEFAULT);
 	static bool LoadSide(Deck& deck, uint32_t* dbuf, uint32_t mainc, uint32_t sidec, bool rituals_in_extra);

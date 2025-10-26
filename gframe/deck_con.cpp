@@ -511,6 +511,13 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 			case COMBOBOX_DBLFLIST: {
 				filterList = &gdeckManager->_lfList[mainGame->cbDBLFList->getSelected()];
 				mainGame->ReloadCBLimit();
+				mainGame->ebGenesys->setText(L"");
+				if (filterList->genesys_threshold >= 0) {
+					mainGame->ebGenesys->setEnabled(true);
+				}
+				else {
+					mainGame->ebGenesys->setEnabled(false);
+				}
 				StartFilter(true);
 				break;
 			}
@@ -1033,6 +1040,8 @@ bool DeckBuilder::FiltersChanged() {
 	CHECK_AND_SET(filter_scl);
 	CHECK_AND_SET(filter_marks);
 	CHECK_AND_SET(filter_lm);
+	CHECK_AND_SET(filter_genesystype);
+	CHECK_AND_SET(filter_genesys);
 	return res;
 }
 #undef CHECK_AND_SET
@@ -1051,6 +1060,7 @@ void DeckBuilder::StartFilter(bool force_refresh) {
 		filter_def = parse_filter(mainGame->ebDefense->getText(), filter_deftype);
 		filter_lv = parse_filter(mainGame->ebStar->getText(), filter_lvtype);
 		filter_scl = parse_filter(mainGame->ebScale->getText(), filter_scltype);
+		filter_genesys = parse_filter(mainGame->ebGenesys->getText(), filter_genesystype);
 	}
 	FilterCards(force_refresh);
 	GetHoveredCard();
@@ -1240,64 +1250,77 @@ bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 				count = -1;
 		} else
 			count = flit->second;
-		switch(filter_lm) {
+
+		if (filterList->genesys_threshold >= 0) {
+			if (filter_genesystype) {
+				if ((filter_genesystype == 1 && count != filter_genesys) || (filter_genesystype == 2 && count < filter_genesys)
+					|| (filter_genesystype == 3 && count <= filter_genesys) || (filter_genesystype == 4 && (count > filter_genesys || count < 0))
+					|| (filter_genesystype == 5 && (count >= filter_genesys || count < 0)) )
+					return false;
+			}
+		}
+		else {
+			switch (filter_lm) {
 			case LIMITATION_FILTER_BANNED:
 			case LIMITATION_FILTER_LIMITED:
 			case LIMITATION_FILTER_SEMI_LIMITED:
-				if(count != filter_lm - 1)
+				if (count != filter_lm - 1)
 					return false;
 				break;
 			case LIMITATION_FILTER_UNLIMITED:
-				if(count < 3)
+				if (count < 3)
 					return false;
 				break;
 			case LIMITATION_FILTER_OCG:
-				if(data._data.ot != SCOPE_OCG)
+				if (data._data.ot != SCOPE_OCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_TCG:
-				if(data._data.ot != SCOPE_TCG)
+				if (data._data.ot != SCOPE_TCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_TCG_OCG:
-				if(data._data.ot != SCOPE_OCG_TCG)
+				if (data._data.ot != SCOPE_OCG_TCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_PRERELEASE:
-				if(!(data._data.ot & SCOPE_PRERELEASE))
+				if (!(data._data.ot & SCOPE_PRERELEASE))
 					return false;
 				break;
 			case LIMITATION_FILTER_SPEED:
-				if(!(data._data.ot & SCOPE_SPEED))
+				if (!(data._data.ot & SCOPE_SPEED))
 					return false;
 				break;
 			case LIMITATION_FILTER_RUSH:
-				if(!(data._data.ot & SCOPE_RUSH))
+				if (!(data._data.ot & SCOPE_RUSH))
 					return false;
 				break;
 			case LIMITATION_FILTER_LEGEND:
-				if(!(data._data.ot & SCOPE_LEGEND))
+				if (!(data._data.ot & SCOPE_LEGEND))
 					return false;
 				break;
 			case LIMITATION_FILTER_ANIME:
-				if(data._data.ot != SCOPE_ANIME)
+				if (data._data.ot != SCOPE_ANIME)
 					return false;
 				break;
 			case LIMITATION_FILTER_ILLEGAL:
-				if(data._data.ot != SCOPE_ILLEGAL)
+				if (data._data.ot != SCOPE_ILLEGAL)
 					return false;
 				break;
 			case LIMITATION_FILTER_VIDEOGAME:
-				if(data._data.ot != SCOPE_VIDEO_GAME)
+				if (data._data.ot != SCOPE_VIDEO_GAME)
 					return false;
 				break;
 			case LIMITATION_FILTER_CUSTOM:
-				if(data._data.ot != SCOPE_CUSTOM)
+				if (data._data.ot != SCOPE_CUSTOM)
 					return false;
 				break;
 			default:
 				break;
+			}
 		}
+
+		
 		if(filterList->whitelist && count < 0)
 			return false;
 	}
@@ -1425,6 +1448,8 @@ void DeckBuilder::ClearDeck() {
 	side_monster_count = 0;
 	side_spell_count = 0;
 	side_trap_count = 0;
+
+	genesys_count = 0;
 }
 void DeckBuilder::RefreshLimitationStatus() {
 	main_and_extra_legend_count_monster = DeckManager::CountLegends(current_deck.main, TYPE_MONSTER) + DeckManager::CountLegends(current_deck.extra, TYPE_MONSTER);
@@ -1444,6 +1469,13 @@ void DeckBuilder::RefreshLimitationStatus() {
 	side_monster_count = DeckManager::TypeCount(current_deck.side, TYPE_MONSTER);
 	side_spell_count = DeckManager::TypeCount(current_deck.side, TYPE_SPELL);
 	side_trap_count = DeckManager::TypeCount(current_deck.side, TYPE_TRAP);
+
+	if (filterList->genesys_threshold >= 0) {
+		genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
+	}
+	else {
+		genesys_count = 0;
+	}
 }
 void DeckBuilder::RefreshLimitationStatusOnRemoved(const CardDataC* card, DeckType location) {
 	switch(location) {
@@ -1495,6 +1527,10 @@ void DeckBuilder::RefreshLimitationStatusOnRemoved(const CardDataC* card, DeckTy
 			break;
 		}
 	}
+
+	if (filterList->genesys_threshold >= 0) {
+		genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
+	}
 }
 void DeckBuilder::RefreshLimitationStatusOnAdded(const CardDataC* card, DeckType location) {
 	switch(location) {
@@ -1545,6 +1581,10 @@ void DeckBuilder::RefreshLimitationStatusOnAdded(const CardDataC* card, DeckType
 				++side_trap_count;
 			break;
 		}
+	}
+
+	if (filterList->genesys_threshold >= 0) {
+		genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
 	}
 }
 bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {

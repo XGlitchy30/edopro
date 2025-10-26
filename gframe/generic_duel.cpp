@@ -363,6 +363,8 @@ void GenericDuel::ToObserver(DuelPlayer* dp) {
 	sctc.type = (dp == host_player ? 0x10 : 0) | dp->type;
 	NetServer::SendPacketToPlayer(dp, STOC_TYPE_CHANGE, sctc);
 }
+
+// Toggles the ready-notready status of a player in the Duel Room. Automatically removes the ready status if Deck is invalid
 void GenericDuel::PlayerReady(DuelPlayer* dp, bool is_ready) {
 	if(dp->type >= (players.home_size + players.opposing_size))
 		return;

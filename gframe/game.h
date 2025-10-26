@@ -340,6 +340,7 @@ struct deck_edit_page_elements {
 	irr::gui::IGUIStaticText* stRace;
 	irr::gui::IGUIStaticText* stAttack;
 	irr::gui::IGUIStaticText* stDefense;
+	irr::gui::IGUIStaticText* stGenesys;
 	irr::gui::IGUIStaticText* stStar;
 	irr::gui::IGUIStaticText* stSearch;
 	irr::gui::IGUIStaticText* stScale;
@@ -355,6 +356,7 @@ struct deck_edit_page_elements {
 	irr::gui::IGUIEditBox* ebScale;
 	irr::gui::IGUIEditBox* ebAttack;
 	irr::gui::IGUIEditBox* ebDefense;
+	irr::gui::IGUIEditBox* ebGenesys;
 	irr::gui::IGUIEditBox* ebCardName;
 	irr::gui::IGUIButton* btnEffectFilter;
 	irr::gui::IGUIButton* btnStartFilter;
@@ -539,6 +541,7 @@ public:
 	void HideElement(irr::gui::IGUIElement* element, bool set_action = false);
 	void PopupElement(irr::gui::IGUIElement* element, int hideframe = 0);
 	void WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck);
+	void DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position, irr::video::ITexture* fontTexture, const irr::core::dimension2du& digitSize, const irr::core::recti* cliprect);
 	void DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag = false, const irr::core::recti* cliprect = nullptr, bool loadimage = true);
 	void DrawDeckBd();
 	void SaveConfig();
