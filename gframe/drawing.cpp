@@ -1179,18 +1179,94 @@ void Game::WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck) {
 	signalFrame = (gGameConfig->quick_animation && frame >= 12) ? 12 * 1000 / 60 : frame * 1000 / 60;
 	frameSignal.Wait(_lck);
 }
+
+/**
+ * @brief Draws a number using a bitmap font texture atlas.
+ * @param number:				The integer to draw.
+ * @param position:				The center position for the entire number.
+ * @param fontTexture:			The texture containing the digit atlas (horizontal strip).
+ * @param originalDigitSize:	The dimensions of a single digit in the source atlas.
+ * @param totalWidth:			The total target width for the rendered number on screen.
+ * @param scaledDigitHeight:	The target height for the rendered digits on screen.
+ * @param cliprect:				Optional clipping rectangle.
+ */
+void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position,
+	irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float totalWidth, float scaledDigitHeight, const irr::core::recti* cliprect) {
+
+	if (!fontTexture || number <= 0 || originalDigitSize.Height == 0) {
+		return;
+	}
+
+	// Prepare string representation
+	const std::string numStr = std::to_string(number);
+	const int numDigits = static_cast<int>(numStr.length());
+	if (numDigits == 0) {
+		return;
+	}
+
+	// Compute space between digits (also handle the special case where there is only 1 digit, so the number is not stretched in an ugly way)
+	float scale = scaledDigitHeight / static_cast<float>(originalDigitSize.Height);
+	float scaledDigitWidth = static_cast<float>(originalDigitSize.Width) * scale;
+	float digitSpace = numDigits > 1 ? totalWidth / numDigits : scaledDigitWidth;
+
+	// Total width in float to keep subpixel precision, then compute centered start.
+	float cursorBaseX = numDigits > 1 ? totalWidth : scaledDigitWidth;
+	float cursorX = static_cast<float>(position.X) - cursorBaseX * 0.5f;
+	const float cursorY = static_cast<float>(position.Y) - scaledDigitHeight * 0.5f;
+
+	// Draw each digit using subpixel cursor and round the destination rect edges.
+	for (char c : numStr) {
+		const int digit = c - '0';
+		if (digit < 0 || digit > 9) {
+			cursorX += digitSpace;
+			continue;
+		}
+
+		irr::core::recti sourceRect(
+			digit * static_cast<irr::s32>(originalDigitSize.Width),
+			0,
+			(digit + 1) * static_cast<irr::s32>(originalDigitSize.Width),
+			static_cast<irr::s32>(originalDigitSize.Height)
+		);
+
+		const irr::s32 destLeft = static_cast<irr::s32>(std::round(cursorX));
+		const irr::s32 destTop = static_cast<irr::s32>(std::round(cursorY));
+		const irr::s32 destRight = static_cast<irr::s32>(std::round(cursorX + digitSpace));
+		const irr::s32 destBottom = static_cast<irr::s32>(std::round(cursorY + scaledDigitHeight));
+
+		irr::core::recti destRect(destLeft, destTop, destRight, destBottom);
+
+		driver->draw2DImage(fontTexture, destRect, sourceRect, cliprect, nullptr, true);
+
+		// advance cursor with subpixel precision to avoid cumulative truncation error
+		cursorX += digitSpace;
+	}
+}
+
+/**
+* @brief Draws the card's thumbnail image, along with the Banned/Limited/Semi-Limited circular icon and the Scope Label
+* @param cp = The card whose image will be drawn
+* @param pos = The position of the card in the window
+* @param lflist = The currently-active banlist
+* @param drag = It is true if the card is being currently dragged across the screen
+* @param cliprect = Clips the destination rectangle (may be 0)
+* @param load_image = It is true if the card's image must be loaded
+**/
 void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag, const irr::core::recti* cliprect, bool load_image) {
+	// Get the card's limitation (count) under the currently-active banlist
 	auto code = cp->code;
 	auto flit = lflist->GetLimitationIterator(cp);
-	int count = 3;
+	int count = lflist->genesys_threshold >=0 ? 0 : 3;
 	if(flit == lflist->content.end()) {
 		if(lflist->whitelist)
 			count = -1;
 	} else
 		count = flit->second;
+
 	irr::video::ITexture* img = load_image ? imageManager.GetTextureCard(code, imgType::THUMB) : imageManager.tUnknown;
 	if (!img)
 		return;
+
 	irr::core::dimension2du size = img->getOriginalSize();
 	irr::core::recti dragloc = Resize(pos.X, pos.Y, pos.X + CARD_THUMB_WIDTH, pos.Y + CARD_THUMB_HEIGHT);
 	irr::core::recti limitloc = Resize(pos.X, pos.Y, pos.X + 20, pos.Y + 20);
@@ -1202,7 +1278,26 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 	}
 	driver->draw2DImage(img, dragloc, irr::core::recti(0, 0, size.Width, size.Height), cliprect);
 	if(!is_siding) {
-		switch(count) {
+
+		if (lflist->genesys_threshold >= 0) {
+			if (count > 0) {
+				int display_count = std::min(count, 1000);
+				irr::video::ITexture* digitbg = imageManager.tDigitBackground;
+				imageManager.draw2DImageFilterScaled(digitbg, limitloc, irr::core::recti(0, 0, digitbg->getOriginalSize().Width, digitbg->getOriginalSize().Height), cliprect, 0, true);
+
+				irr::video::ITexture* digitstrip = imageManager.tDigits;
+				const irr::core::dimension2du originalDigitSize(digitstrip->getOriginalSize().Width / 10, digitstrip->getOriginalSize().Height);
+				irr::core::vector2di center = limitloc.getCenter();
+
+				float inner_limitbox_width = limitloc.getWidth() * 0.8375;
+				float inner_limitbox_height = limitloc.getHeight() * 0.6; //* 0.675;
+
+				DrawNumberWithBitmapFont(display_count, center, digitstrip, originalDigitSize,
+					inner_limitbox_width, inner_limitbox_height, cliprect);
+			}
+		}
+		else {
+			switch (count) {
 			case -1:
 			case 0:
 				imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(0, 0, 64, 64), cliprect, 0, true);
@@ -1214,11 +1309,13 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 				imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(0, 64, 64, 128), cliprect, 0, true);
 				break;
 			default:
-				if(cp->ot & SCOPE_LEGEND) {
+				if (cp->ot & SCOPE_LEGEND) {
 					imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(64, 64, 128, 128), cliprect, 0, true);
 				}
 				break;
+			}
 		}
+	
 #define IDX(scope,idx) case SCOPE_##scope:\
 							index = idx;\
 							goto draw;
@@ -1266,10 +1363,11 @@ void Game::DrawDeckBd() {
 		const auto main_deck_size_str = GetDeckSizeStr(current_deck.main, gdeckManager->pre_deck.main);
 		DrawShadowText(numFont, main_deck_size_str, Resize(379, 137, 439, 157), Resize(1, 1, 1, 1), 0xffffffff, 0xff000000, false, true);
 
-		const auto main_types_count_str = epro::format(L"{} {} {} {} {} {}",
-													  gDataManager->GetSysString(1312), deckBuilder.main_monster_count,
-													  gDataManager->GetSysString(1313), deckBuilder.main_spell_count,
-													  gDataManager->GetSysString(1314), deckBuilder.main_trap_count);
+		const auto main_types_count_str = epro::format(L"{} {} {} {} {} {} {} {}",
+			gDataManager->GetSysString(1312), deckBuilder.main_monster_count,
+			gDataManager->GetSysString(1313), deckBuilder.main_spell_count,
+			gDataManager->GetSysString(1314), deckBuilder.main_trap_count,
+			gDataManager->GetSysString(4500), deckBuilder.genesys_count);
 
 		const auto mainpos = Resize(310, 137, 797, 157);
 		const auto mainDeckTypeSize = textFont->getDimensionustring(main_types_count_str);

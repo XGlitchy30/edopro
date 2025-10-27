@@ -34,6 +34,8 @@ void DeckManager::ClearDummies() {
 }
 bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 	static constexpr auto key = "$whitelist"sv;
+	static constexpr auto genesys_key = "$genesys"sv;
+
 	FileStream infile{ path, FileStream::in };
 	if(infile.fail())
 		return false;
@@ -56,13 +58,34 @@ bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 			lflist.content.clear();
 			lflist.hash = 0x7dfcee6a;
 			lflist.whitelist = false;
+			lflist.genesys_threshold = -1;
 			loaded = true;
 			continue;
 		}
+
 		if(str.rfind(key.data(), 0, key.size()) == 0) {
 			lflist.whitelist = true;
 			continue;
 		}
+
+		// Determine if lflist is a point-list for Genesys format
+		if (str.rfind(genesys_key.data(), 0, genesys_key.size()) == 0) {
+			try {
+				auto p = str.find(' ');
+				if (p != std::string::npos) {
+					lflist.genesys_threshold = std::stoi(str.substr(p + 1));
+				}
+			}
+			catch (const std::invalid_argument& ia) {
+				lflist.genesys_threshold = -1;
+			}
+			catch (const std::out_of_range& oor) {
+				lflist.genesys_threshold = -1;
+			}
+
+			continue;
+		}
+
 		if(!lflist.hash)
 			continue;
 		auto p = str.find(' ');
@@ -103,6 +126,7 @@ void DeckManager::LoadLFList() {
 	nolimit.hash = 0;
 	nolimit.content.clear();
 	nolimit.whitelist = false;
+	nolimit.genesys_threshold = -1;
 	_lfList.push_back(nolimit);
 	null_lflist_index = _lfList.size() - 1;
 }
@@ -154,11 +178,26 @@ int DeckManager::CountLegends(const Deck::Vector& cards, uint32_t type) {
 	return count;
 
 }
+int DeckManager::GenesysCount(const Deck::Vector& cards, LFList const* curlist) {
+	int count = 0;
+	for (const auto cit : cards) {
+		uint32_t code = cit->alias ? cit->alias : cit->code;
+		auto it = curlist->GetLimitationIterator(cit);
+		auto is_end = it == curlist->content.end();
+		if (!is_end)
+			count += it->second;
+	}
+	return count;
+
+}
+
+// Check each card of the current Deck (Main, Extra or Side) and verify whether it is legal, or its quantity does not surpass the banlist limits
 static DeckError CheckCards(const Deck::Vector& cards, LFList const* curlist,
 					  DuelAllowedCards allowedCards,
 					  banlist_content_t& ccount,
 					  std::function<DeckError(const CardDataC*)> additionalCheck = nullptr) {
 	DeckError ret{ DeckError::NONE };
+
 	for (const auto cit : cards) {
 		ret.code = cit->code;
 		switch (allowedCards) {
@@ -198,9 +237,13 @@ static DeckError CheckCards(const Deck::Vector& cards, LFList const* curlist,
 		auto is_end = it == curlist->content.end();
 		if ((!is_end && dc > it->second) || (curlist->whitelist && is_end))
 			return ret.type = DeckError::LFLIST, ret;
+
 	}
+
 	return { DeckError::NONE };
 }
+
+// Check the full Main, Extra and Side Deck for legality
 DeckError DeckManager::CheckDeckContent(const Deck& deck, LFList const* lflist, DuelAllowedCards allowedCards, uint32_t forbiddentypes, bool rituals_in_extra) {
 	DeckError ret{ DeckError::NONE };
 	if(TypeCount(deck.main, forbiddentypes) > 0 || TypeCount(deck.extra, forbiddentypes) > 0 || TypeCount(deck.side, forbiddentypes) > 0)
@@ -213,9 +256,18 @@ DeckError DeckManager::CheckDeckContent(const Deck& deck, LFList const* lflist, 
 		return ret.type = DeckError::TOOMANYLEGENDS, ret;
 	if(TypeCount(deck.main, TYPE_SKILL) > 1)
 		return ret.type = DeckError::TOOMANYSKILLS, ret;
+
 	banlist_content_t ccount;
 	if(!lflist)
 		return ret;
+
+	if (lflist->genesys_threshold >= 0) {
+		int genesys_total = GenesysCount(deck.main, lflist) + GenesysCount(deck.extra, lflist) + GenesysCount(deck.side, lflist);
+		if (genesys_total > lflist->genesys_threshold) {
+			return ret.type = DeckError::GENESYS, ret;
+		}
+	}
+
 	ret = CheckCards(deck.main, lflist, allowedCards, ccount, [&](const CardDataC* cit)->DeckError {
 		if ((cit->type & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ)) || (cit->type & TYPE_LINK && cit->type & TYPE_MONSTER))
 			return { DeckError::EXTRACOUNT };
@@ -224,6 +276,7 @@ DeckError DeckManager::CheckDeckContent(const Deck& deck, LFList const* lflist, 
 		return { DeckError::NONE };
 	});
 	if (ret.type) return ret;
+
 	ret = CheckCards(deck.extra, lflist, allowedCards, ccount, [&](const CardDataC* cit)->DeckError {
 		if(cit->isRitualMonster()) {
 			if(!rituals_in_extra)
@@ -233,6 +286,7 @@ DeckError DeckManager::CheckDeckContent(const Deck& deck, LFList const* lflist, 
 		return { DeckError::NONE };
 	});
 	if (ret.type) return ret;
+
 	return CheckCards(deck.side, lflist, allowedCards, ccount);
 }
 DeckError DeckManager::CheckDeckSize(const Deck& deck, const DeckSizes& sizes) {

@@ -69,6 +69,7 @@ struct CardDataC {
 	uint32_t link_marker;
 	uint32_t ot;
 	uint32_t category;
+	uint16_t genesys_points;
 	std::vector<uint16_t> setcodes;
 
 	static constexpr auto CARD_ARTWORK_VERSIONS_OFFSET = 10;
