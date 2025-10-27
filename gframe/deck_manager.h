@@ -22,6 +22,7 @@ struct LFList {
 	banlist_content_t content;
 	bool whitelist;
 	int genesys_threshold;
+
 	auto GetLimitationIterator(const CardDataC* pcard) const {
 		auto flit = content.find(pcard->code);
 		if(flit == content.end() && pcard->alias) {
@@ -29,6 +30,23 @@ struct LFList {
 				flit = content.find(pcard->alias);
 		}
 		return flit;
+	}
+
+	/**
+	@brief Returns the Genesys Points of the passed card. If the current banlist is not a Genesys list, it defaults to 0
+	@param pcard = The card that will be checked
+	@return points = The points of pcard
+	**/
+	uint16_t GetGenesysPointsOfCard(const CardDataC* pcard) const {
+		int points = 0;
+		if (pcard && genesys_threshold >= 0) {
+			auto flit = GetLimitationIterator(pcard);
+			if (flit != content.end()) {
+				points = flit->second;
+			}
+		}
+
+		return points;
 	}
 };
 enum class DuelAllowedCards {

@@ -1180,16 +1180,14 @@ void Game::WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck) {
 	frameSignal.Wait(_lck);
 }
 
-// --- Place this function in an appropriate utility class or within the Game class ---
-
 /**
  * @brief Draws a number using a bitmap font texture atlas.
- * @param number The integer to draw.
- * @param position The center position for the entire number.
- * @param fontTexture The texture containing the digit atlas (horizontal strip).
- * @param originalDigitSize The dimensions of a single digit in the source atlas.
- * @param scaledDigitHeight The target height for the rendered digits on screen.
- * @param cliprect Optional clipping rectangle.
+ * @param number:				The integer to draw.
+ * @param position:				The center position for the entire number.
+ * @param fontTexture:			The texture containing the digit atlas (horizontal strip).
+ * @param originalDigitSize:	The dimensions of a single digit in the source atlas.
+ * @param scaledDigitHeight:	The target height for the rendered digits on screen.
+ * @param cliprect:				Optional clipping rectangle.
  */
 void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position,
 	irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float scaledDigitHeight, const irr::core::recti* cliprect) {
@@ -1200,7 +1198,7 @@ void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& posi
 
 	float scale = scaledDigitHeight / static_cast<float>(originalDigitSize.Height);
 	float scaledDigitWidth = static_cast<float>(originalDigitSize.Width) * scale;
-
+	
 	std::string numStr = std::to_string(number);
 	int numDigits = numStr.length();
 	if (numDigits == 0) {
@@ -1261,7 +1259,7 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 				irr::core::vector2di center = limitloc.getCenter();
 
 				DrawNumberWithBitmapFont(display_count, center, digitstrip, originalDigitSize,
-					static_cast<float>(limitloc.getHeight() - limitloc.getHeight() * 0.45), cliprect);
+					static_cast<float>(limitloc.getHeight() * 0.4), cliprect);
 			}
 		}
 		else {

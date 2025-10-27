@@ -243,7 +243,8 @@ void Game::Initialize() {
 		GetLocalizedCompatVersion().data(),
 		Scale(10, 100, 290, 125), false, true, wVersion);
 	((irr::gui::CGUICustomContextMenu*)mVersion)->addItem(wVersion, -1);
-	//main menu
+
+	// Main Menu (removed Server button for the time being)
 	int mainMenuWidth = std::max(280, static_cast<int>(titleWidth / dpi_scale + 15));
 	mainMenuLeftX = 510 - mainMenuWidth / 2;
 	mainMenuRightX = 510 + mainMenuWidth / 2;
@@ -252,9 +253,9 @@ void Game::Initialize() {
 	//wMainMenu->setVisible(!is_from_discord);
 #define OFFSET(x1, y1, x2, y2) Scale(10, 30 + offset, mainMenuWidth - 10, 60 + offset)
 	int offset = 0;
-	btnOnlineMode = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_ONLINE_MULTIPLAYER, gDataManager->GetSysString(2042).data());
-	defaultStrings.emplace_back(btnOnlineMode, 2042);
-	offset += 35;
+	//btnOnlineMode = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_ONLINE_MULTIPLAYER, gDataManager->GetSysString(2042).data());
+	//defaultStrings.emplace_back(btnOnlineMode, 2042);
+	//offset += 35;
 	btnLanMode = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_LAN_MODE, gDataManager->GetSysString(1200).data());
 	defaultStrings.emplace_back(btnLanMode, 1200);
 	offset += 35;
@@ -271,6 +272,7 @@ void Game::Initialize() {
 	defaultStrings.emplace_back(btnModeExit, 1210);
 	offset += 35;
 #undef OFFSET
+
 	//lan mode
 	wLanWindow = env->addWindow(Scale(220, 100, 800, 520), false, gDataManager->GetSysString(1200).data());
 	defaultStrings.emplace_back(wLanWindow, 1200);
@@ -701,7 +703,7 @@ void Game::Initialize() {
 	stGenesys = env->addStaticText(L"", Scale(205, 51, 298, 71), false, false, wFilter);
 	defaultStrings.emplace_back(stGenesys, 4502);
 
-	ebGenesys = AlignElementWithParent(env->addEditBox(L"", Scale(300, 49, 340, 69), true, wFilter, EDITBOX_GENESYS));
+	ebGenesys = AlignElementWithParent(env->addEditBox(L"", Scale(302, 49, 340, 69), true, wFilter, EDITBOX_GENESYS));
 	ebGenesys->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 
 	// Level
