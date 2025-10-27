@@ -1186,45 +1186,74 @@ void Game::WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck) {
  * @param position:				The center position for the entire number.
  * @param fontTexture:			The texture containing the digit atlas (horizontal strip).
  * @param originalDigitSize:	The dimensions of a single digit in the source atlas.
+ * @param totalWidth:			The total target width for the rendered number on screen.
  * @param scaledDigitHeight:	The target height for the rendered digits on screen.
  * @param cliprect:				Optional clipping rectangle.
  */
 void Game::DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position,
-	irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float scaledDigitHeight, const irr::core::recti* cliprect) {
+	irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float totalWidth, float scaledDigitHeight, const irr::core::recti* cliprect) {
 
 	if (!fontTexture || number <= 0 || originalDigitSize.Height == 0) {
 		return;
 	}
 
-	float scale = scaledDigitHeight / static_cast<float>(originalDigitSize.Height);
-	float scaledDigitWidth = static_cast<float>(originalDigitSize.Width) * scale;
-	
-	std::string numStr = std::to_string(number);
-	int numDigits = numStr.length();
+	// Prepare string representation
+	const std::string numStr = std::to_string(number);
+	const int numDigits = static_cast<int>(numStr.length());
 	if (numDigits == 0) {
 		return;
 	}
 
-	int totalWidth = numDigits * scaledDigitWidth;
+	// Compute space between digits (also handle the special case where there is only 1 digit, so the number is not stretched in an ugly way)
+	float scale = scaledDigitHeight / static_cast<float>(originalDigitSize.Height);
+	float scaledDigitWidth = static_cast<float>(originalDigitSize.Width) * scale;
+	float digitSpace = numDigits > 1 ? totalWidth / numDigits : scaledDigitWidth;
 
-	irr::core::vector2di currentPos;
-	currentPos.X = static_cast<irr::s32>(position.X - totalWidth / 2.0f);
-	currentPos.Y = static_cast<irr::s32>(position.Y - scaledDigitHeight / 2.0f);
+	// Total width in float to keep subpixel precision, then compute centered start.
+	float cursorBaseX = numDigits > 1 ? totalWidth : scaledDigitWidth;
+	float cursorX = static_cast<float>(position.X) - cursorBaseX * 0.5f;
+	const float cursorY = static_cast<float>(position.Y) - scaledDigitHeight * 0.5f;
 
-	for (char const& c : numStr) {
-		int digit = c - '0';
+	// Draw each digit using subpixel cursor and round the destination rect edges.
+	for (char c : numStr) {
+		const int digit = c - '0';
+		if (digit < 0 || digit > 9) {
+			cursorX += digitSpace;
+			continue;
+		}
 
-		irr::core::recti sourceRect(digit * originalDigitSize.Width, 0, (digit + 1) * originalDigitSize.Width, originalDigitSize.Height);
-		irr::core::recti destRect(currentPos.X, currentPos.Y, static_cast<irr::s32>(currentPos.X + scaledDigitWidth),
-			static_cast<irr::s32>(currentPos.Y + scaledDigitHeight));
-		driver->draw2DImage(fontTexture, destRect, sourceRect, cliprect, 0, true);
+		irr::core::recti sourceRect(
+			digit * static_cast<irr::s32>(originalDigitSize.Width),
+			0,
+			(digit + 1) * static_cast<irr::s32>(originalDigitSize.Width),
+			static_cast<irr::s32>(originalDigitSize.Height)
+		);
 
-		currentPos.X += static_cast<irr::s32>(scaledDigitWidth);
+		const irr::s32 destLeft = static_cast<irr::s32>(std::round(cursorX));
+		const irr::s32 destTop = static_cast<irr::s32>(std::round(cursorY));
+		const irr::s32 destRight = static_cast<irr::s32>(std::round(cursorX + digitSpace));
+		const irr::s32 destBottom = static_cast<irr::s32>(std::round(cursorY + scaledDigitHeight));
+
+		irr::core::recti destRect(destLeft, destTop, destRight, destBottom);
+
+		driver->draw2DImage(fontTexture, destRect, sourceRect, cliprect, nullptr, true);
+
+		// advance cursor with subpixel precision to avoid cumulative truncation error
+		cursorX += digitSpace;
 	}
 }
 
-// Draws the card's thumbnail image, along with the Banned/Limited/Semi-Limited circular icon and the Scope Label
+/**
+* @brief Draws the card's thumbnail image, along with the Banned/Limited/Semi-Limited circular icon and the Scope Label
+* @param cp = The card whose image will be drawn
+* @param pos = The position of the card in the window
+* @param lflist = The currently-active banlist
+* @param drag = It is true if the card is being currently dragged across the screen
+* @param cliprect = Clips the destination rectangle (may be 0)
+* @param load_image = It is true if the card's image must be loaded
+**/
 void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag, const irr::core::recti* cliprect, bool load_image) {
+	// Get the card's limitation (count) under the currently-active banlist
 	auto code = cp->code;
 	auto flit = lflist->GetLimitationIterator(cp);
 	int count = lflist->genesys_threshold >=0 ? 0 : 3;
@@ -1233,9 +1262,11 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 			count = -1;
 	} else
 		count = flit->second;
+
 	irr::video::ITexture* img = load_image ? imageManager.GetTextureCard(code, imgType::THUMB) : imageManager.tUnknown;
 	if (!img)
 		return;
+
 	irr::core::dimension2du size = img->getOriginalSize();
 	irr::core::recti dragloc = Resize(pos.X, pos.Y, pos.X + CARD_THUMB_WIDTH, pos.Y + CARD_THUMB_HEIGHT);
 	irr::core::recti limitloc = Resize(pos.X, pos.Y, pos.X + 20, pos.Y + 20);
@@ -1258,8 +1289,11 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 				const irr::core::dimension2du originalDigitSize(digitstrip->getOriginalSize().Width / 10, digitstrip->getOriginalSize().Height);
 				irr::core::vector2di center = limitloc.getCenter();
 
+				float inner_limitbox_width = limitloc.getWidth() * 0.8375;
+				float inner_limitbox_height = limitloc.getHeight() * 0.6; //* 0.675;
+
 				DrawNumberWithBitmapFont(display_count, center, digitstrip, originalDigitSize,
-					static_cast<float>(limitloc.getHeight() * 0.4), cliprect);
+					inner_limitbox_width, inner_limitbox_height, cliprect);
 			}
 		}
 		else {

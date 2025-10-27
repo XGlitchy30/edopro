@@ -3792,6 +3792,15 @@ void Game::OnResize() {
 	roomListTable->removeRow(roomListTable->getRowCount() - 1);
 	roomListTable->setSelected(prev);
 }
+
+/**
+* @brief Resizes coordinates of a rectangle according to the current window scale
+* @param x = The X coordinate of the upper-left corner
+* @param y = The Y coordinate of the upper-left corner
+* @param x2 = The X coordinate of the lower-right corner
+* @param y2 = The Y coordinate of the lower-right corner
+* @return The resized rectangle
+**/
 irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) const {
 	x = x * window_scale.X;
 	y = y * window_scale.Y;
@@ -3799,6 +3808,18 @@ irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) 
 	y2 = y2 * window_scale.Y;
 	return Scale(x, y, x2, y2);
 }
+/**
+* @brief Resizes coordinates of a rectangle according to the current window scale, then applies additional offsets which are not subject to the resize
+* @param x = The X coordinate of the upper-left corner
+* @param y = The Y coordinate of the upper-left corner
+* @param x2 = The X coordinate of the lower-right corner
+* @param y2 = The Y coordinate of the lower-right corner
+* @param dx = X offset for upper-left corner
+* @param dy = Y offset for upper-left corner
+* @param dx2 = X offset for lower-right corner
+* @param dy2 = Y offset for lower-right corner
+* @return The resized rectangle, compensated with the point offsets
+**/
 irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 dx, irr::s32 dy, irr::s32 dx2, irr::s32 dy2) const {
 	x = x * window_scale.X + dx;
 	y = y * window_scale.Y + dy;
@@ -3806,6 +3827,15 @@ irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, 
 	y2 = y2 * window_scale.Y + dy2;
 	return Scale(x, y, x2, y2);
 }
+
+/**
+* @brief Resizes a pair of coordinates according to the current window scale. Useful to convert single points between logical and physical spaces
+* @param x = The X coordinate
+* @param y = The Y coordinate
+* @param reverse = If false (most common use case), the coords are multiplied by the window scale and the dots-per-inch scale (logical->physical). If true, the coords are divided by the two factors instead (physical->logical).
+* @param y2 = The Y coordinate of the lower-right corner
+* @return The resized point
+**/
 irr::core::vector2di Game::Resize(irr::s32 x, irr::s32 y, bool reverse) const {
 	if(reverse) {
 		x = (x / window_scale.X) / gGameConfig->dpi_scale;

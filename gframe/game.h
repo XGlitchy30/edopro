@@ -541,7 +541,7 @@ public:
 	void HideElement(irr::gui::IGUIElement* element, bool set_action = false);
 	void PopupElement(irr::gui::IGUIElement* element, int hideframe = 0);
 	void WaitFrameSignal(int frame, std::unique_lock<epro::mutex>& _lck);
-	void DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position, irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float scaledDigitHeight, const irr::core::recti* cliprect);
+	void DrawNumberWithBitmapFont(int number, const irr::core::vector2di& position, irr::video::ITexture* fontTexture, const irr::core::dimension2du& originalDigitSize, float totalWidth, float scaledDigitHeight, const irr::core::recti* cliprect);
 	void DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lflist, bool drag = false, const irr::core::recti* cliprect = nullptr, bool loadimage = true);
 	void DrawDeckBd();
 	void SaveConfig();
