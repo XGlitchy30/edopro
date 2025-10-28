@@ -1247,13 +1247,16 @@ bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 		return false;
 
 	if (filterList->genesys_threshold >= 0) {
+		if (data._data.type & filterList->genesys_forbidden_types)
+			return false;
+
 		uint16_t genesys_points = filterList->GetGenesysPointsOfCard(&data._data);
 
 		if (filter_genesystype) {
 			// If the GP box is filled, only pointed cards are shown by default. Non-pointed cards are shown if, and only if, GP is set to 0
 			if ((filter_genesystype == 1 && genesys_points != filter_genesys) || (filter_genesystype == 2 && genesys_points < filter_genesys)
 				|| (filter_genesystype == 3 && genesys_points <= filter_genesys) || (filter_genesystype == 4 && (genesys_points > filter_genesys || genesys_points == 0))
-				|| (filter_genesystype == 5 && (genesys_points >= filter_genesys || genesys_points == 0)) || filter_lvtype == 6)
+				|| (filter_genesystype == 5 && (genesys_points >= filter_genesys || genesys_points == 0)) || filter_genesystype == 6)
 				return false;
 		}
 	}
@@ -1626,11 +1629,16 @@ bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {
 		if(container.size() >= 60)
 			return false;
 
-		uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
-		if (genesys_points > 0) {
-			if (genesys_count + genesys_points > filterList->genesys_threshold)
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
 				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
 		}
+		
 	}
 	if(seq >= 0 && seq < (int)container.size())
 		container.insert(container.begin() + seq, pointer);
@@ -1667,10 +1675,14 @@ bool DeckBuilder::push_extra(const CardDataC* pointer, int seq, bool forced) {
 		if(container.size() >= 15)
 			return false;
 
-		uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
-		if (genesys_points > 0) {
-			if (genesys_count + genesys_points > filterList->genesys_threshold)
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
 				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
 		}
 	}
 	if(seq >= 0 && seq < (int)container.size())
@@ -1694,10 +1706,14 @@ bool DeckBuilder::push_side(const CardDataC* pointer, int seq, bool forced) {
 		if (container.size() >= 15)
 			return false;
 
-		uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
-		if (genesys_points > 0) {
-			if (genesys_count + genesys_points > filterList->genesys_threshold)
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
 				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
 		}
 	}
 
@@ -1743,6 +1759,9 @@ bool DeckBuilder::check_limit(const CardDataC* pointer) {
 	int found = 0;
 	int limit = filterList->whitelist ? 0 : 3;
 	bool is_genesys = filterList->genesys_threshold >= 0;
+	if (is_genesys && (pointer->type & filterList->genesys_forbidden_types)) {
+		return false;
+	}
 
 	auto endit = filterList->content.end();
 	auto it = filterList->GetLimitationIterator(pointer);

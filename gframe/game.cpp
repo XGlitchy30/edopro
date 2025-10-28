@@ -199,7 +199,7 @@ void Game::Initialize() {
 	wAbout->setDrawTitlebar(false);
 	wAbout->setDrawBackground(false);
 	stAbout = irr::gui::CGUICustomText::addCustomText(L"Project Ignis: EDOPro\n"
-											L"The bleeding-edge automatic duel simulator\n"
+											L"Genesys Deck Edit mod for EdoPro, by XGlitchy30\n"
 											L"\n"
 											L"Copyright (C) 2020-2025 Edoardo Lolletti (edo9300) and others\n"
 											L"Card scripts and supporting resources by Project Ignis.\n"

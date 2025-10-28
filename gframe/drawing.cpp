@@ -1280,7 +1280,10 @@ void Game::DrawThumb(const CardDataC* cp, irr::core::vector2di pos, LFList* lfli
 	if(!is_siding) {
 
 		if (lflist->genesys_threshold >= 0) {
-			if (count > 0) {
+			if (cp->type & lflist->genesys_forbidden_types) {
+				imageManager.draw2DImageFilterScaled(imageManager.tLim, limitloc, irr::core::recti(0, 0, 64, 64), cliprect, 0, true);
+			}
+			else if (count > 0) {
 				int display_count = std::min(count, 1000);
 				irr::video::ITexture* digitbg = imageManager.tDigitBackground;
 				imageManager.draw2DImageFilterScaled(digitbg, limitloc, irr::core::recti(0, 0, digitbg->getOriginalSize().Width, digitbg->getOriginalSize().Height), cliprect, 0, true);
