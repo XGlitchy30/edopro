@@ -15,13 +15,19 @@ namespace ygo {
 using banlist_content_t = std::unordered_map<uint32_t, int>;
 using cardlist_type = std::vector<uint32_t>;
 
-// Banlist files struct (genesys_threshold is -1 by default)
+/**
+* @brief Banlist files struct.
+* Genesys property is set by: "$genesys [threshold] --pendulum=true/false --link=true/false"
+* @param threshold = The maximum value of allowed Genesys Points in a Deck
+* @param By default, Pendulum and Links are disabled
+**/
 struct LFList {
 	uint32_t hash;
 	std::wstring listName;
 	banlist_content_t content;
 	bool whitelist;
 	int genesys_threshold;
+	int genesys_forbidden_types = TYPE_PENDULUM | TYPE_LINK;
 
 	auto GetLimitationIterator(const CardDataC* pcard) const {
 		auto flit = content.find(pcard->code);

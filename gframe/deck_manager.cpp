@@ -59,6 +59,7 @@ bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 			lflist.hash = 0x7dfcee6a;
 			lflist.whitelist = false;
 			lflist.genesys_threshold = -1;
+			lflist.genesys_forbidden_types = TYPE_PENDULUM | TYPE_LINK;
 			loaded = true;
 			continue;
 		}
@@ -68,19 +69,86 @@ bool DeckManager::LoadLFListSingle(const epro::path_string& path) {
 			continue;
 		}
 
-		// Determine if lflist is a point-list for Genesys format
+		// Determine if lflist is a point-list for Genesys format and parse optional flags
 		if (str.rfind(genesys_key.data(), 0, genesys_key.size()) == 0) {
-			try {
-				auto p = str.find(' ');
-				if (p != std::string::npos) {
-					lflist.genesys_threshold = std::stoi(str.substr(p + 1));
+			auto rest = str.substr(genesys_key.size());
+			auto first_non = rest.find_first_not_of(' ');
+			if (first_non != std::string::npos)
+				rest = rest.substr(first_non);
+			else
+				rest.clear();
+
+			// default threshold and flags handling
+			lflist.genesys_threshold = -1;
+
+			// parse first token as threshold if present and not starting with '-'
+			std::size_t pos = 0;
+			auto next_space = rest.find(' ');
+			std::string firstTok = (next_space == std::string::npos) ? rest : rest.substr(0, next_space);
+			if (!firstTok.empty() && firstTok[0] != '-') {
+				try {
+					lflist.genesys_threshold = std::stoi(firstTok);
 				}
+				catch (...) {
+					lflist.genesys_threshold = -1;
+				}
+				// advance pos after the threshold token
+				pos = (next_space == std::string::npos) ? rest.size() : next_space + 1;
 			}
-			catch (const std::invalid_argument& ia) {
-				lflist.genesys_threshold = -1;
+			else {
+				pos = 0;
 			}
-			catch (const std::out_of_range& oor) {
-				lflist.genesys_threshold = -1;
+
+			// parse remaining tokens
+			while (pos < rest.size()) {
+				auto s = rest.find_first_not_of(' ', pos);
+				if (s == std::string::npos) break;
+				auto e = rest.find(' ', s);
+				auto tok = (e == std::string::npos) ? rest.substr(s) : rest.substr(s, e - s);
+				pos = (e == std::string::npos) ? rest.size() : e + 1;
+
+				// only process tokens that start with "--"
+				if (tok.size() >= 3 && tok[0] == '-' && tok[1] == '-') {
+					// get flag name up to first '=' (if any)
+					auto eq = tok.find('=');
+					std::string name;
+					std::string value;
+					if (eq == std::string::npos) {
+						// If no value is inserted after the equal, the sole presence of the token will be interpreted as true
+						name = tok.substr(2);
+						value = "true";
+					}
+					else {
+						name = tok.substr(2, eq - 2);
+						auto vstart = tok.find_first_not_of('=', eq);
+						if (vstart == std::string::npos)
+							value = "true";
+						else
+							value = tok.substr(vstart);
+					}
+					// normalize name and value to lowercase
+					for (auto& ch : name) if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+					for (auto& ch : value) if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+
+					// value will be true if it starts with t/1/y, false otherwise
+					bool enabled = false;
+					if (!value.empty() && (value[0] == 't' || value[0] == '1' || value[0] == 'y'))
+						enabled = true;
+
+					// apply known flags: pendulum and link
+					if (name.find("pendulum") != std::string::npos) {
+						if (enabled)
+							lflist.genesys_forbidden_types &= ~TYPE_PENDULUM;
+						else
+							lflist.genesys_forbidden_types |= TYPE_PENDULUM;
+					}
+					else if (name.find("link") != std::string::npos) {
+						if (enabled)
+							lflist.genesys_forbidden_types &= ~TYPE_LINK;
+						else
+							lflist.genesys_forbidden_types |= TYPE_LINK;
+					}
+				}
 			}
 
 			continue;
@@ -127,6 +195,7 @@ void DeckManager::LoadLFList() {
 	nolimit.content.clear();
 	nolimit.whitelist = false;
 	nolimit.genesys_threshold = -1;
+	nolimit.genesys_forbidden_types = TYPE_PENDULUM | TYPE_LINK;
 	_lfList.push_back(nolimit);
 	null_lflist_index = _lfList.size() - 1;
 }
@@ -262,6 +331,8 @@ DeckError DeckManager::CheckDeckContent(const Deck& deck, LFList const* lflist, 
 		return ret;
 
 	if (lflist->genesys_threshold >= 0) {
+		if (TypeCount(deck.main, lflist->genesys_forbidden_types) > 0 || TypeCount(deck.extra, lflist->genesys_forbidden_types) > 0 || TypeCount(deck.side, lflist->genesys_forbidden_types) > 0)
+			return ret.type = DeckError::FORBTYPE, ret;
 		int genesys_total = GenesysCount(deck.main, lflist) + GenesysCount(deck.extra, lflist) + GenesysCount(deck.side, lflist);
 		if (genesys_total > lflist->genesys_threshold) {
 			return ret.type = DeckError::GENESYS, ret;
