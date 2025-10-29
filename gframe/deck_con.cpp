@@ -516,9 +516,11 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 				mainGame->ebGenesys->setText(L"");
 				if (filterList->genesys_threshold >= 0) {
 					mainGame->ebGenesys->setEnabled(true);
+					genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
 				}
 				else {
 					mainGame->ebGenesys->setEnabled(false);
+					genesys_count = 0;
 				}
 				StartFilter(true);
 				break;
