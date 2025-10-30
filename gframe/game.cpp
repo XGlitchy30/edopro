@@ -3394,10 +3394,18 @@ std::wstring Game::GetLocalizedExpectedCore() {
 std::wstring Game::GetLocalizedCompatVersion() {
 	return epro::format(gDataManager->GetSysString(2012), PRO_VERSION >> 12, (PRO_VERSION >> 4) & 0xff, PRO_VERSION & 0xf);
 }
+
+/**
+* @brief Reloads the sort type dropbox in Deck Edit
+**/
 void Game::ReloadCBSortType() {
 	cbSortType->clear();
 	for (int i = 1370; i <= 1373; i++)
 		cbSortType->addItem(gDataManager->GetSysString(i).data());
+
+	// Genesys Sort
+	if(deckBuilder.filterList && deckBuilder.filterList->genesys_threshold >= 0)
+		cbSortType->addItem(gDataManager->GetSysString(4503).data());
 }
 void Game::ReloadCBCardType() {
 	cbCardType->clear();

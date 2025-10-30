@@ -1409,6 +1409,8 @@ void DeckBuilder::ClearFilter() {
 	for(int i = 0; i < 8; i++)
 		mainGame->btnMark[i]->setPressed(false);
 }
+
+// Sorting for Deck Edit
 void DeckBuilder::SortList() {
 	auto last = [&] {
 		auto it = results.begin(), left = it;
@@ -1429,7 +1431,7 @@ void DeckBuilder::SortList() {
 		sort(DataManager::deck_sort_lv);
 		break;
 	case 1:
-		sort( DataManager::deck_sort_atk);
+		sort(DataManager::deck_sort_atk);
 		break;
 	case 2:
 		sort(DataManager::deck_sort_def);
@@ -1437,8 +1439,17 @@ void DeckBuilder::SortList() {
 	case 3:
 		sort(DataManager::deck_sort_name);
 		break;
+	case 4:
+		sort([&](const CardDataC* p1, const CardDataC* p2) {
+			return DataManager::deck_sort_genesys(p1, p2, this->filterList);
+		});
+		break;
 	}
 }
+
+/**
+@brief Clears the currently-active Deck in Deck Edit
+**/
 void DeckBuilder::ClearDeck() {
 	current_deck.main.clear();
 	current_deck.extra.clear();

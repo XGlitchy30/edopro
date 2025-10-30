@@ -40,6 +40,8 @@ struct OCG_CardData;
 
 namespace ygo {
 
+struct LFList;
+
 struct CardData {
 	uint32_t code;
 	uint32_t alias;
@@ -69,7 +71,6 @@ struct CardDataC {
 	uint32_t link_marker;
 	uint32_t ot;
 	uint32_t category;
-	uint16_t genesys_points;
 	std::vector<uint16_t> setcodes;
 
 	static constexpr auto CARD_ARTWORK_VERSIONS_OFFSET = 10;
@@ -181,10 +182,14 @@ public:
 
 	static constexpr auto unknown_string = L"???"sv;
 	static void CardReader(void* payload, uint32_t code, OCG_CardData* data);
+
+	// Card sorting functions in Deck Edit
 	static bool deck_sort_lv(const CardDataC* l1, const CardDataC* l2);
 	static bool deck_sort_atk(const CardDataC* l1, const CardDataC* l2);
 	static bool deck_sort_def(const CardDataC* l1, const CardDataC* l2);
 	static bool deck_sort_name(const CardDataC* l1, const CardDataC* l2);
+	static bool deck_sort_genesys(const CardDataC* l1, const CardDataC* l2, const LFList* filterList);
+	
 private:
 	std::unique_ptr<sqlite3_vfs> irrvfs;
 	template<typename T1, typename T2 = T1>

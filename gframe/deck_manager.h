@@ -55,6 +55,7 @@ struct LFList {
 		return points;
 	}
 };
+
 enum class DuelAllowedCards {
 	ALLOWED_CARDS_OCG_ONLY,
 	ALLOWED_CARDS_TCG_ONLY,

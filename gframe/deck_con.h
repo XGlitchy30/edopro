@@ -145,12 +145,14 @@ public:
 	uint16_t side_spell_count;
 	uint16_t side_trap_count;
 
-	uint16_t genesys_count;
-
 	LFList* filterList;
+
 	std::map<std::wstring, std::vector<const CardDataC*>, std::less<>> searched_terms;
 	std::vector<const CardDataC*> results;
 	std::wstring result_string;
+
+	// Genesys 
+	uint16_t genesys_count; // Genesys Deck total
 };
 
 }
