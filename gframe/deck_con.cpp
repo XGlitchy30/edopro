@@ -523,6 +523,7 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 					genesys_count = 0;
 				}
 				StartFilter(true);
+				mainGame->ReloadCBSortType();
 				break;
 			}
 			case COMBOBOX_DBDECKS: {
