@@ -664,24 +664,35 @@ bool DataManager::deck_sort_name(const CardDataC* p1, const CardDataC* p2) {
 		return res < 0;
 	return check_codes(p1, p2);
 }
+/**
+* @brief Genesys Points sorting logic
+**/
 bool DataManager::deck_sort_genesys(const CardDataC* p1, const CardDataC* p2, const LFList* filterList) {
 	uint16_t gp1 = filterList->GetGenesysPointsOfCard(p1);
 	uint16_t gp2 = filterList->GetGenesysPointsOfCard(p2);
-	return card_sorter(p1, p2, [&](const CardDataC* p1, const CardDataC* p2)->bool {
-		if (gp1 != gp2)
-			return gp1 > gp2;
-		if (p1->attack != p2->attack)
-			return p1->attack > p2->attack;
-		if (p1->defense != p2->defense)
-			return p1->defense > p2->defense;
-		if (p1->level != p2->level)
-			return p1->level > p2->level;
+	if (gp1 != gp2)
+		// First compare Genesys Points
+		return gp1 > gp2;
+	if ((p1->type & monster_spell_trap) != (p2->type & monster_spell_trap))
+		// If GP are equal, monsters come first, then Spells and lastly Traps
+		return (p1->type & monster_spell_trap) < (p2->type & monster_spell_trap);
+
+	if ((p1->type & monster_spell_trap) == TYPE_MONSTER && (p2->type & monster_spell_trap) == TYPE_MONSTER) {
+		// Apply same sorting logic as deck_sort_lv if both are monsters
 		uint32_t type1 = get_monster_card_type(p1->type);
 		uint32_t type2 = get_monster_card_type(p2->type);
 		if (type1 != type2)
 			return type1 < type2;
-		return check_codes(p1, p2);
-		});
+		if (p1->level != p2->level)
+			return p1->level > p2->level;
+		if (p1->attack != p2->attack)
+			return p1->attack > p2->attack;
+		if (p1->defense != p2->defense)
+			return p1->defense > p2->defense;
+	}
+
+	// Lastly, check codes
+	return check_codes(p1, p2);
 }
 
 }
