@@ -474,6 +474,7 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 			case EDITBOX_DEFENSE:
 			case EDITBOX_STAR:
 			case EDITBOX_SCALE:
+			case EDITBOX_GENESYS:
 			case EDITBOX_KEYWORD: {
 				StartFilter();
 				break;
@@ -496,6 +497,7 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 				break;
 			}
 			case EDITBOX_STAR:
+			case EDITBOX_GENESYS:
 			case EDITBOX_SCALE: {
 				StartFilter();
 				break;
@@ -512,7 +514,17 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 			case COMBOBOX_DBLFLIST: {
 				filterList = &gdeckManager->_lfList[mainGame->cbDBLFList->getSelected()];
 				mainGame->ReloadCBLimit();
+				mainGame->ebGenesys->setText(L"");
+				if (filterList->genesys_threshold >= 0) {
+					mainGame->ebGenesys->setEnabled(true);
+					genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
+				}
+				else {
+					mainGame->ebGenesys->setEnabled(false);
+					genesys_count = 0;
+				}
 				StartFilter(true);
+				mainGame->ReloadCBSortType();
 				break;
 			}
 			case COMBOBOX_DBDECKS: {
@@ -1034,6 +1046,8 @@ bool DeckBuilder::FiltersChanged() {
 	CHECK_AND_SET(filter_scl);
 	CHECK_AND_SET(filter_marks);
 	CHECK_AND_SET(filter_lm);
+	CHECK_AND_SET(filter_genesystype);
+	CHECK_AND_SET(filter_genesys);
 	return res;
 }
 #undef CHECK_AND_SET
@@ -1041,6 +1055,7 @@ void DeckBuilder::StartFilter(bool force_refresh) {
 	filter_type = mainGame->cbCardType->getItemData(mainGame->cbCardType->getSelected());
 	filter_type2 = mainGame->cbCardType2->getItemData(mainGame->cbCardType2->getSelected());
 	filter_lm = static_cast<limitation_search_filters>(mainGame->cbLimit->getItemData(mainGame->cbLimit->getSelected()));
+	filter_genesys = parse_filter(mainGame->ebGenesys->getText(), filter_genesystype);
 	if(filter_type == CARD_TYPE_FILTER_MONSTER) {
 		filter_attrib = mainGame->cbAttribute->getItemData(mainGame->cbAttribute->getSelected());
 		auto selected = mainGame->cbRace->getItemData(mainGame->cbRace->getSelected());
@@ -1191,6 +1206,7 @@ void DeckBuilder::FilterCards(bool force_refresh) {
 bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 	if(data._data.type & TYPE_TOKEN || data._data.ot & SCOPE_HIDDEN || ((data._data.ot & SCOPE_OFFICIAL) != data._data.ot && (!mainGame->chkAnime->isChecked() && !filterList->whitelist)))
 		return false;
+
 	switch(filter_type) {
 	case CARD_TYPE_FILTER_MONSTER: {
 		if(!(data._data.type & TYPE_MONSTER) || (data._data.type & filter_type2) != filter_type2)
@@ -1251,63 +1267,80 @@ bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 		return false;
 	if(filter_marks && (data._data.link_marker & filter_marks) != filter_marks)
 		return false;
-	if((filter_lm != LIMITATION_FILTER_NONE || filterList->whitelist) && filter_lm != LIMITATION_FILTER_ALL) {
+
+	if (filterList->genesys_threshold >= 0) {
+		if (data._data.type & filterList->genesys_forbidden_types)
+			return false;
+
+		uint16_t genesys_points = filterList->GetGenesysPointsOfCard(&data._data);
+
+		if (filter_genesystype) {
+			// If the GP box is filled, only pointed cards are shown by default. Non-pointed cards are shown if, and only if, GP is set to 0
+			if ((filter_genesystype == 1 && genesys_points != filter_genesys) || (filter_genesystype == 2 && genesys_points < filter_genesys)
+				|| (filter_genesystype == 3 && genesys_points <= filter_genesys) || (filter_genesystype == 4 && (genesys_points > filter_genesys || genesys_points == 0))
+				|| (filter_genesystype == 5 && (genesys_points >= filter_genesys || genesys_points == 0)) || filter_genesystype == 6)
+				return false;
+		}
+	}
+	else if ((filter_lm != LIMITATION_FILTER_NONE || filterList->whitelist) && filter_lm != LIMITATION_FILTER_ALL) {
 		auto flit = filterList->GetLimitationIterator(&data._data);
 		int count = 3;
-		if(flit == filterList->content.end()) {
-			if(filterList->whitelist)
+		if (flit == filterList->content.end()) {
+			if (filterList->whitelist)
 				count = -1;
-		} else
+		}
+		else
 			count = flit->second;
-		switch(filter_lm) {
+
+		switch (filter_lm) {
 			case LIMITATION_FILTER_BANNED:
 			case LIMITATION_FILTER_LIMITED:
 			case LIMITATION_FILTER_SEMI_LIMITED:
-				if(count != filter_lm - 1)
+				if (count != filter_lm - 1)
 					return false;
 				break;
 			case LIMITATION_FILTER_UNLIMITED:
-				if(count < 3)
+				if (count < 3)
 					return false;
 				break;
 			case LIMITATION_FILTER_OCG:
-				if(data._data.ot != SCOPE_OCG)
+				if (data._data.ot != SCOPE_OCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_TCG:
-				if(data._data.ot != SCOPE_TCG)
+				if (data._data.ot != SCOPE_TCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_TCG_OCG:
-				if(data._data.ot != SCOPE_OCG_TCG)
+				if (data._data.ot != SCOPE_OCG_TCG)
 					return false;
 				break;
 			case LIMITATION_FILTER_PRERELEASE:
-				if(!(data._data.ot & SCOPE_PRERELEASE))
+				if (!(data._data.ot & SCOPE_PRERELEASE))
 					return false;
 				break;
 			case LIMITATION_FILTER_SPEED:
-				if(!(data._data.ot & SCOPE_SPEED))
+				if (!(data._data.ot & SCOPE_SPEED))
 					return false;
 				break;
 			case LIMITATION_FILTER_RUSH:
-				if(!(data._data.ot & SCOPE_RUSH))
+				if (!(data._data.ot & SCOPE_RUSH))
 					return false;
 				break;
 			case LIMITATION_FILTER_LEGEND:
-				if(!(data._data.ot & SCOPE_LEGEND))
+				if (!(data._data.ot & SCOPE_LEGEND))
 					return false;
 				break;
 			case LIMITATION_FILTER_ANIME:
-				if(data._data.ot != SCOPE_ANIME)
+				if (data._data.ot != SCOPE_ANIME)
 					return false;
 				break;
 			case LIMITATION_FILTER_ILLEGAL:
-				if(data._data.ot != SCOPE_ILLEGAL)
+				if (data._data.ot != SCOPE_ILLEGAL)
 					return false;
 				break;
 			case LIMITATION_FILTER_VIDEOGAME:
-				if(data._data.ot != SCOPE_VIDEO_GAME)
+				if (data._data.ot != SCOPE_VIDEO_GAME)
 					return false;
 				break;
 			case LIMITATION_FILTER_CUSTOM:
@@ -1317,9 +1350,12 @@ bool DeckBuilder::CheckCardProperties(const CardDataM& data) {
 			default:
 				break;
 		}
-		if(filterList->whitelist && count < 0)
+
+
+		if (filterList->whitelist && count < 0)
 			return false;
 	}
+
 	return true;
 }
 static const auto& CardSetcodes(const CardDataC& data) {
@@ -1368,6 +1404,7 @@ void DeckBuilder::ClearSearch() {
 	mainGame->cbAttribute->setEnabled(false);
 	mainGame->ebAttack->setEnabled(false);
 	mainGame->ebDefense->setEnabled(false);
+	mainGame->ebGenesys->setText(L"");
 	mainGame->ebStar->setEnabled(false);
 	mainGame->ebScale->setEnabled(false);
 	mainGame->ebCardName->setText(L"");
@@ -1394,6 +1431,8 @@ void DeckBuilder::ClearFilter() {
 	for(int i = 0; i < 8; i++)
 		mainGame->btnMark[i]->setPressed(false);
 }
+
+// Sorting for Deck Edit
 void DeckBuilder::SortList() {
 	auto last = [&] {
 		auto it = results.begin(), left = it;
@@ -1428,8 +1467,17 @@ void DeckBuilder::SortList() {
 	case SORT_MODIFIER::SORT_MODIFIER_PASSCODE_ASC:
 		sort(std::not_fn(DataManager::deck_sort_passcode_descending));
 		break;
+	case SORT_MODIFIER::SORT_MODIFIER_GENESYS:
+		sort([&](const CardDataC* p1, const CardDataC* p2) {
+			return DataManager::deck_sort_genesys(p1, p2, this->filterList);
+			});
+		break;
 	}
 }
+
+/**
+@brief Clears the currently-active Deck in Deck Edit
+**/
 void DeckBuilder::ClearDeck() {
 	current_deck.main.clear();
 	current_deck.extra.clear();
@@ -1452,6 +1500,8 @@ void DeckBuilder::ClearDeck() {
 	side_monster_count = 0;
 	side_spell_count = 0;
 	side_trap_count = 0;
+
+	genesys_count = 0;
 }
 void DeckBuilder::RefreshLimitationStatus() {
 	main_and_extra_legend_count_monster = DeckManager::CountLegends(current_deck.main, TYPE_MONSTER) + DeckManager::CountLegends(current_deck.extra, TYPE_MONSTER);
@@ -1471,6 +1521,13 @@ void DeckBuilder::RefreshLimitationStatus() {
 	side_monster_count = DeckManager::TypeCount(current_deck.side, TYPE_MONSTER);
 	side_spell_count = DeckManager::TypeCount(current_deck.side, TYPE_SPELL);
 	side_trap_count = DeckManager::TypeCount(current_deck.side, TYPE_TRAP);
+
+	if (filterList->genesys_threshold >= 0) {
+		genesys_count = DeckManager::GenesysCount(current_deck.main, filterList) + DeckManager::GenesysCount(current_deck.extra, filterList) + DeckManager::GenesysCount(current_deck.side, filterList);
+	}
+	else {
+		genesys_count = 0;
+	}
 }
 void DeckBuilder::RefreshLimitationStatusOnRemoved(const CardDataC* card, DeckType location) {
 	switch(location) {
@@ -1522,6 +1579,9 @@ void DeckBuilder::RefreshLimitationStatusOnRemoved(const CardDataC* card, DeckTy
 			break;
 		}
 	}
+
+	uint16_t genesys_delta = filterList->GetGenesysPointsOfCard(card);
+	genesys_count -= genesys_delta;
 }
 void DeckBuilder::RefreshLimitationStatusOnAdded(const CardDataC* card, DeckType location) {
 	switch(location) {
@@ -1573,7 +1633,17 @@ void DeckBuilder::RefreshLimitationStatusOnAdded(const CardDataC* card, DeckType
 			break;
 		}
 	}
+
+	uint16_t genesys_delta = filterList->GetGenesysPointsOfCard(card);
+	genesys_count += genesys_delta;
 }
+
+/** 
+* @brief Handles the addition of a card into the Main Deck in Deck Edit
+* @param pointer:	The card being added
+* @param seq:		The position of the card inside the Main Deck (should be >0 only if the card is being actively dragged?)
+* @param forced:	Is true if Deck limitations are being ignored
+*/
 bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {
 	if(pointer->isRitualMonster()) {
 		if(mainGame->is_siding) {
@@ -1586,6 +1656,7 @@ bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {
 		return false;
 	if((pointer->type & (TYPE_LINK | TYPE_SPELL)) == TYPE_LINK)
 		return false;
+
 	auto& container = current_deck.main;
 	if(!forced && !mainGame->is_siding) {
 		if(main_and_extra_legend_count_monster >= 1 && (pointer->ot & SCOPE_LEGEND) && (pointer->type & TYPE_MONSTER))
@@ -1598,6 +1669,17 @@ bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {
 			return false;
 		if(container.size() >= 60)
 			return false;
+
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
+				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
+		}
+		
 	}
 	if(seq >= 0 && seq < (int)container.size())
 		container.insert(container.begin() + seq, pointer);
@@ -1607,6 +1689,13 @@ bool DeckBuilder::push_main(const CardDataC* pointer, int seq, bool forced) {
 	RefreshLimitationStatusOnAdded(pointer, DeckType::MAIN);
 	return true;
 }
+
+/**
+* @brief Handles the addition of a card into the Extra Deck in Deck Edit
+* @param pointer:	The card being added
+* @param seq:		The position of the card inside the Main Deck (should be >0 only if the card is being actively dragged?)
+* @param forced:	Is true if Deck limitations are being ignored
+*/
 bool DeckBuilder::push_extra(const CardDataC* pointer, int seq, bool forced) {
 	if(pointer->isRitualMonster()) {
 		if(mainGame->is_siding) {
@@ -1619,12 +1708,23 @@ bool DeckBuilder::push_extra(const CardDataC* pointer, int seq, bool forced) {
 			return false;
 	} else if((pointer->type & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ)) == 0)
 		return false;
+
 	auto& container = current_deck.extra;
 	if(!forced && !mainGame->is_siding) {
 		if(main_and_extra_legend_count_monster >= 1 && (pointer->ot & SCOPE_LEGEND))
 			return false;
 		if(container.size() >= 15)
 			return false;
+
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
+				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
+		}
 	}
 	if(seq >= 0 && seq < (int)container.size())
 		container.insert(container.begin() + seq, pointer);
@@ -1634,10 +1734,30 @@ bool DeckBuilder::push_extra(const CardDataC* pointer, int seq, bool forced) {
 	RefreshLimitationStatusOnAdded(pointer, DeckType::EXTRA);
 	return true;
 }
+
+/**
+* @brief Handles the addition of a card into the Side Deck in Deck Edit
+* @param pointer:	The card being added
+* @param seq:		The position of the card inside the Main Deck (should be >0 only if the card is being actively dragged?)
+* @param forced:	Is true if Deck limitations are being ignored
+*/
 bool DeckBuilder::push_side(const CardDataC* pointer, int seq, bool forced) {
 	auto& container = current_deck.side;
-	if(!mainGame->is_siding && !forced && container.size() >= 15)
-		return false;
+	if (!mainGame->is_siding && !forced) {
+		if (container.size() >= 15)
+			return false;
+
+		if (filterList->genesys_threshold > 0) {
+			if (pointer->type & filterList->genesys_forbidden_types)
+				return false;
+			uint16_t genesys_points = filterList->GetGenesysPointsOfCard(pointer);
+			if (genesys_points > 0) {
+				if (genesys_count + genesys_points > filterList->genesys_threshold)
+					return false;
+			}
+		}
+	}
+
 	if(seq >= 0 && seq < (int)container.size())
 		container.insert(container.begin() + seq, pointer);
 	else
@@ -1670,24 +1790,38 @@ void DeckBuilder::pop_side(int seq) {
 	GetHoveredCard();
 	RefreshLimitationStatusOnRemoved(pcard, DeckType::SIDE);
 }
+/**
+* @brief Checks the banlist legality of a card
+* @param pointer = Pointer to the card being checked
+* @return bool = Returns true if the card is legal under the current banlist and Deck cumulative quantity
+**/
 bool DeckBuilder::check_limit(const CardDataC* pointer) {
 	uint32_t limitcode = pointer->alias ? pointer->alias : pointer->code;
 	int found = 0;
 	int limit = filterList->whitelist ? 0 : 3;
+	bool is_genesys = filterList->genesys_threshold >= 0;
+	if (is_genesys && (pointer->type & filterList->genesys_forbidden_types)) {
+		return false;
+	}
+
 	auto endit = filterList->content.end();
 	auto it = filterList->GetLimitationIterator(pointer);
-	if(it != endit)
+	if(it != endit && !is_genesys)
 		limit = it->second;
 	if(limit == 0)
 		return false;
+
 	const auto& deck = current_deck;
 	for(auto* plist : { &deck.main, &deck.extra, &deck.side }) {
 		for(auto& pcard : *plist) {
 			if(pcard->code == limitcode || pcard->alias == limitcode) {
-				if((it = filterList->content.find(pcard->code)) != endit)
-					limit = std::min(limit, it->second);
-				else if((it = filterList->content.find(pcard->alias)) != endit)
-					limit = std::min(limit, it->second);
+				if (!is_genesys) {
+					if ((it = filterList->content.find(pcard->code)) != endit)
+						limit = std::min(limit, it->second);
+					else if ((it = filterList->content.find(pcard->alias)) != endit)
+						limit = std::min(limit, it->second);
+				}
+				
 				found++;
 			}
 			if(limit <= found)

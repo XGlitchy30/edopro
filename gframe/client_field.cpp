@@ -39,6 +39,7 @@ ClientField::ClientField() {
 	remove_act[0] = remove_act[1] = false;
 	extra_act[0] = extra_act[1] = false;
 	pzone_act[0] = pzone_act[1] = false;
+	skill_act[0] = skill_act[1] = false; // [skill-zone]
 	conti_act = false;
 	deck_reversed = false;
 	conti_selecting = false;
@@ -67,6 +68,7 @@ void ClientField::Clear() {
 		ClearVector(extra[i]);
 	}
 	ClearVector(limbo_temp);
+	ClearVector(limbo_chain); // [skill-zone]
 	ClearVector(overlay_cards);
 	if(skills[0]) {
 		delete skills[0];
@@ -106,6 +108,7 @@ void ClientField::Clear() {
 	remove_act[0] = remove_act[1] = false;
 	extra_act[0] = extra_act[1] = false;
 	pzone_act[0] = pzone_act[1] = false;
+	skill_act[0] = skill_act[1] = false; // [skill_zone]
 	conti_act = false;
 	conti_selecting = false;
 	deck_reversed = false;
@@ -160,6 +163,8 @@ std::vector<ClientCard*>* ClientField::GetList(uint8_t location, uint8_t control
 	return nullptr;
 }
 ClientCard* ClientField::GetCard(uint8_t controler, uint8_t location, size_t sequence, size_t sub_seq) {
+	if (location == 0) // [skill-zone]
+		return (sequence == SKILL_ZONE_SEQUENCE && controler < 2) ? skills[controler] : nullptr;
 	bool is_xyz = (location & LOCATION_OVERLAY) != 0;
 	auto lst = GetList(location & (~LOCATION_OVERLAY), controler);
 	if(!lst)
@@ -336,6 +341,7 @@ void ClientField::ClearCommandFlag() {
 	remove_act[0] = remove_act[1] = false;
 	extra_act[0] = extra_act[1] = false;
 	pzone_act[0] = pzone_act[1] = false;
+	skill_act[0] = skill_act[1] = false; // [skill-zone]
 	conti_act = false;
 }
 void ClientField::ClearSelect() {
@@ -357,6 +363,7 @@ void ClientField::ClearChainSelect() {
 	remove_act[0] = remove_act[1] = false;
 	extra_act[0] = extra_act[1] = false;
 	pzone_act[0] = pzone_act[1] = false;
+	skill_act[0] = skill_act[1] = false; // [skill-zone]
 	conti_act = false;
 }
 // needs to be synchronized with EGET_SCROLL_BAR_CHANGED
@@ -739,6 +746,18 @@ void ClientField::GetChainDrawCoordinates(uint8_t controler, uint8_t location, u
 	case LOCATION_EXTRA: {
 		loc = matManager.getExtra()[controler];
 		PileZ(extra[controler]);
+		break;
+	}
+	case 0: {
+		// [skill-zone]
+		if (sequence != SKILL_ZONE_SEQUENCE) {
+			t->X = 0;
+			t->Y = 0;
+			t->Z = 0;
+			return;
+		}
+		loc = matManager.getSkill()[controler];
+		t->Z = 0.03f;
 		break;
 	}
 	default:
@@ -1278,6 +1297,26 @@ size_t ClientField::UpdateDeclarableList(bool refresh) {
 	}
 	return ancard.size();
 }
+
+// Drop the references a chain keeps to pcard before pcard is deleted
+// [skill-zone]: HINT_SKILL_REMOVE and MSG_REMOVE_CARDS delete the card of a Skill Zone, which can now be the card of a chain link or one of its targets
+void ClientField::ReleaseChainReferences(ClientCard* pcard) {
+	for (auto& chain : chains) {
+		if (chain.chain_card == pcard)
+			chain.chain_card = nullptr;
+		chain.target.erase(pcard);
+	}
+	if (current_chain.chain_card == pcard)
+		current_chain.chain_card = nullptr;
+	current_chain.target.erase(pcard);
+	if (highlighting_card == pcard)
+		highlighting_card = nullptr;
+	if (clicked_card == pcard)
+		clicked_card = nullptr;
+	if (command_card == pcard)
+		command_card = nullptr;
+}
+
 void ChainInfo::UpdateDrawCoordinates() {
 	mainGame->dField.GetChainDrawCoordinates(controler, location, sequence, &chain_pos);
 }

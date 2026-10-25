@@ -49,6 +49,7 @@ public:
 		SORT_MODIFIER_NAME_ASC,
 		SORT_MODIFIER_PASSCODE_DESC,
 		SORT_MODIFIER_PASSCODE_ASC,
+		SORT_MODIFIER_GENESYS,
 	};
 	enum CARD_TYPE_FILTER {
 		CARD_TYPE_FILTER_ALL,
@@ -122,6 +123,8 @@ private:
 	DECLARE_WITH_CACHE(uint32_t, filter_scl)
 	DECLARE_WITH_CACHE(uint32_t, filter_marks)
 	DECLARE_WITH_CACHE(limitation_search_filters, filter_lm)
+	DECLARE_WITH_CACHE(uint32_t, filter_genesystype)
+	DECLARE_WITH_CACHE(uint16_t, filter_genesys)
 #undef DECLARE_WITH_CACHE
 
 	irr::core::vector2di mouse_pos;
@@ -158,10 +161,15 @@ public:
 	uint16_t side_monster_count;
 	uint16_t side_spell_count;
 	uint16_t side_trap_count;
+
 	LFList* filterList;
+
 	std::map<std::wstring, std::vector<const CardDataC*>, std::less<>> searched_terms;
 	std::vector<const CardDataC*> results;
 	std::wstring result_string;
+
+	// Genesys 
+	uint16_t genesys_count; // Genesys Deck total
 };
 
 }

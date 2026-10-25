@@ -15,11 +15,20 @@ namespace ygo {
 using banlist_content_t = std::unordered_map<uint32_t, int>;
 using cardlist_type = std::vector<uint32_t>;
 
+/**
+* @brief Banlist files struct.
+* Genesys property is set by: "$genesys [threshold] --pendulum=true/false --link=true/false"
+* @param threshold = The maximum value of allowed Genesys Points in a Deck
+* @param By default, Pendulum and Links are disabled
+**/
 struct LFList {
 	uint32_t hash;
 	std::wstring listName;
 	banlist_content_t content;
 	bool whitelist;
+	int genesys_threshold;
+	int genesys_forbidden_types = TYPE_PENDULUM | TYPE_LINK;
+
 	auto GetLimitationIterator(const CardDataC* pcard) const {
 		auto flit = content.find(pcard->code);
 		if(flit == content.end() && pcard->alias) {
@@ -28,7 +37,25 @@ struct LFList {
 		}
 		return flit;
 	}
+
+	/**
+	@brief Returns the Genesys Points of the passed card. If the current banlist is not a Genesys list, it defaults to 0
+	@param pcard = The card that will be checked
+	@return points = The points of pcard
+	**/
+	uint16_t GetGenesysPointsOfCard(const CardDataC* pcard) const {
+		int points = 0;
+		if (pcard && genesys_threshold >= 0) {
+			auto flit = GetLimitationIterator(pcard);
+			if (flit != content.end()) {
+				points = flit->second;
+			}
+		}
+
+		return points;
+	}
 };
+
 enum class DuelAllowedCards {
 	ALLOWED_CARDS_OCG_ONLY,
 	ALLOWED_CARDS_TCG_ONLY,
@@ -74,6 +101,7 @@ public:
 	static DeckError CheckDeckSize(const Deck& deck, const DeckSizes& sizes);
 	static int TypeCount(const Deck::Vector& cards, uint32_t type);
 	static int CountLegends(const Deck::Vector& cards, uint32_t type);
+	static int GenesysCount(const Deck::Vector& cards, LFList const* lflist);
 	static uint32_t LoadDeckFromBuffer(Deck& deck, uint32_t* dbuf, uint32_t mainc, uint32_t sidec, RITUAL_LOCATION rituals_in_extra = RITUAL_LOCATION::DEFAULT);
 	static uint32_t LoadDeck(Deck& deck, const cardlist_type& mainlist, const cardlist_type& sidelist, const cardlist_type* extralist = nullptr, RITUAL_LOCATION rituals_in_extra = RITUAL_LOCATION::DEFAULT);
 	static bool LoadSide(Deck& deck, uint32_t* dbuf, uint32_t mainc, uint32_t sidec, bool rituals_in_extra);

@@ -1582,6 +1582,7 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 			auto lock = LockIf();
 			auto& pcard = mainGame->dField.skills[player];
 			if(pcard) {
+				mainGame->dField.ReleaseChainReferences(pcard); // [skill_zone]: the card may be the card or a target of a chain link
 				if(!mainGame->dInfo.isCatchingUp) {
 					int frames = 20;
 					if(gGameConfig->quick_animation)
@@ -1745,6 +1746,8 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 					mainGame->dField.remove_act[pcard->controler] = true;
 				else if (pcard->location == LOCATION_EXTRA)
 					mainGame->dField.extra_act[pcard->controler] = true;
+				else if (pcard->location == LOCATION_SKILL) // [skill-zone]
+					mainGame->dField.skill_act[pcard->controler] = true;
 			}
 		}
 		mainGame->dField.attackable_cards.clear();
@@ -1902,6 +1905,8 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 					mainGame->dField.remove_act[pcard->controler] = true;
 				else if (pcard->location == LOCATION_EXTRA)
 					mainGame->dField.extra_act[pcard->controler] = true;
+				else if (pcard->location == LOCATION_SKILL) // [skill_zone]
+					mainGame->dField.skill_act[pcard->controler] = true;
 			}
 		}
 		std::lock_guard<epro::mutex> lock(mainGame->gMutex);
@@ -1943,11 +1948,13 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		}
 		std::lock_guard<epro::mutex> lock(mainGame->gMutex);
 		ClientCard* pcard = mainGame->dField.GetCard(info.controler, info.location, info.sequence);
-		if (pcard->code != code)
-			pcard->SetCode(code);
-		if(info.location != LOCATION_DECK) {
-			pcard->is_highlighting = true;
-			mainGame->dField.highlighting_card = pcard;
+		if (pcard) { // [skill_zone] no highlight for a location-0 card the client does not display
+			if (pcard->code != code)
+				pcard->SetCode(code);
+			if (info.location != LOCATION_DECK) {
+				pcard->is_highlighting = true;
+				mainGame->dField.highlighting_card = pcard;
+			}
 		}
 		mainGame->stQMessage->setText(text.data());
 		mainGame->PopupElement(mainGame->wQuery);
@@ -2167,17 +2174,20 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 					pcard->cmdFlag |= COMMAND_RESET;
 				else
 					pcard->cmdFlag |= COMMAND_ACTIVATE;
-				if(pcard->location == LOCATION_DECK) {
+				if (pcard->location == LOCATION_DECK) {
 					pcard->SetCode(code);
 					mainGame->dField.deck_act[pcard->controler] = true;
-				} else if(info.location == LOCATION_GRAVE)
+				}
+				else if (info.location == LOCATION_GRAVE)
 					mainGame->dField.grave_act[pcard->controler] = true;
-				else if(info.location == LOCATION_REMOVED)
+				else if (info.location == LOCATION_REMOVED)
 					mainGame->dField.remove_act[pcard->controler] = true;
-				else if(info.location == LOCATION_EXTRA)
+				else if (info.location == LOCATION_EXTRA)
 					mainGame->dField.extra_act[pcard->controler] = true;
-				else if(info.location == LOCATION_OVERLAY)
+				else if (info.location == LOCATION_OVERLAY)
 					panelmode = true;
+				else if (pcard->location == LOCATION_SKILL) // [skill_zone]
+					mainGame->dField.skill_act[pcard->controler] = true;
 			}
 		}
 		const auto ignore_chain = mainGame->btnChainIgnore->isPressed();
@@ -3363,6 +3373,16 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		/*const auto ct = */CompatRead<uint8_t, uint32_t>(pbuf);
 		ClientCard* pcard = mainGame->dField.GetCard(mainGame->LocalPlayer(info.controler), info.location, info.sequence, info.position);
 		auto lock = LockIf();
+
+		if (!pcard) {
+			// [skill_zone] a chain link of a location-0 card the client does not display: use a temporary card instead of dereferencing nullptr. It is not drawn and is freed at MSG_CHAIN_END.
+			pcard = new ClientCard{};
+			pcard->controler = mainGame->LocalPlayer(info.controler);
+			pcard->code = code;
+			pcard->is_public = true;
+			mainGame->dField.limbo_chain.push_back(pcard);
+		}
+
 		if(pcard->code != code || (!pcard->is_public && !mainGame->dInfo.compat_mode)) {
 			pcard->is_public = mainGame->dInfo.compat_mode;
 			pcard->code = code;
@@ -3450,9 +3470,18 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		for(const auto& chain : mainGame->dField.chains) {
 			for(const auto& target : chain.target)
 				target->is_showchaintarget = false;
-			chain.chain_card->is_showchaintarget = false;
+			if (chain.chain_card) // [skill_zone]
+				chain.chain_card->is_showchaintarget = false;
 		}
 		mainGame->dField.chains.clear();
+
+		// [skill_zone] handle clearing temporary chain cards created by MSG_CHAINING
+		for (auto& pcard : mainGame->dField.limbo_chain) {
+			if (pcard == mainGame->dField.hovered_card)
+				mainGame->dField.hovered_card = nullptr;
+			delete pcard;
+		}
+		mainGame->dField.limbo_chain.clear();
 		return true;
 	}
 	case MSG_CHAIN_NEGATED:
@@ -3484,11 +3513,13 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 				pcard = mainGame->dField.GetCard(info.controler, info.location & (~LOCATION_OVERLAY) & 0xff, info.sequence)->overlayed[info.position];
 			else
 				pcard = mainGame->dField.GetCard(info.controler, info.location, info.sequence);
-			pcard->is_highlighting = true;
+			if (pcard) // [skill_zone]
+				pcard->is_highlighting = true;
 		}
 		mainGame->WaitFrameSignal(30, lock);
 		for(auto& pcard : pcards)
-			pcard->is_highlighting = false;
+			if (pcard) // [skill_zone]
+				pcard->is_highlighting = false;
 		return true;
 	}
 	case MSG_CARD_SELECTED:
@@ -3499,6 +3530,8 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		for(uint32_t i = 0; i < count; ++i) {
 			CoreUtils::loc_info info = CoreUtils::ReadLocInfo(pbuf, mainGame->dInfo.compat_mode);
 			ClientCard* pcard = mainGame->dField.GetCard(mainGame->LocalPlayer(info.controler), info.location, info.sequence);
+			if (!pcard) // [skill_zone]
+				continue;
 			std::unique_lock<epro::mutex> lock(mainGame->gMutex);
 			pcard->is_highlighting = true;
 			if(mainGame->dInfo.curMsg == MSG_BECOME_TARGET)
@@ -3717,6 +3750,8 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		const auto s = BufferIO::Read<uint8_t>(pbuf);
 		const auto count = BufferIO::Read<uint16_t>(pbuf);
 		ClientCard* pc = mainGame->dField.GetCard(c, l, s);
+		if (!pc) // [skill_zone]
+			return true;
 		if (pc->counters.count(type))
 			pc->counters[type] += count;
 		else pc->counters[type] = count;
@@ -3738,6 +3773,8 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 		const auto s = BufferIO::Read<uint8_t>(pbuf);
 		const auto count = BufferIO::Read<uint16_t>(pbuf);
 		ClientCard* pc = mainGame->dField.GetCard(c, l, s);
+		if (!pc) // [skill_zone]
+			return true;
 		auto lock = LockIf();
 		pc->counters[type] -= count;
 		if (pc->counters[type] <= 0)
@@ -4032,6 +4069,7 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 				} else
 					pcard = mainGame->dField.GetCard(loc.controler, loc.location, loc.sequence);
 			}
+			cards.erase(std::remove(cards.begin(), cards.end(), nullptr), cards.end()); // [skill-zone] skip location-0 cards the client does not display
 			auto lock = LockIf();
 			if(!mainGame->dInfo.isCatchingUp) {
 				for(auto& pcard : cards)
@@ -4041,6 +4079,17 @@ int DuelClient::ClientAnalyze(const uint8_t* msg, uint32_t len) {
 			for(auto& pcard : cards) {
 				if(pcard == mainGame->dField.hovered_card)
 					mainGame->dField.hovered_card = 0;
+
+				if (pcard->location == LOCATION_SKILL) {
+					// [skill_zone] the card of a Skill Zone is not in any list so just empty the Skill Zone
+					mainGame->dField.ReleaseChainReferences(pcard);
+					for (auto& skill : mainGame->dField.skills) {
+						if (skill == pcard)
+							skill = nullptr;
+					}
+					delete pcard;
+					continue;
+				}
 				if(pcard->location & LOCATION_OVERLAY) {
 					pcard->overlayTarget->overlayed.erase(pcard->overlayTarget->overlayed.begin() + pcard->sequence);
 					mainGame->dField.overlay_cards.erase(pcard);

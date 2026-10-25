@@ -1138,8 +1138,10 @@ bool ClientField::OnEvent(const irr::SEvent& event) {
 			if(panel && panel->isVisible())
 				break;
 			GetHoverField(mousepos);
-			if(hovered_location & 0xe)
+			if (hovered_location & 0xe)
 				clicked_card = GetCard(hovered_controler, hovered_location, hovered_sequence);
+			else if (hovered_location == LOCATION_SKILL) // [skill-zone]
+				clicked_card = skills[hovered_controler];
 			else clicked_card = 0;
 			if(mainGame->dInfo.isReplay) {
 				if(mainGame->wCardSelect->isVisible())
@@ -1285,7 +1287,8 @@ bool ClientField::OnEvent(const irr::SEvent& event) {
 				}
 				case LOCATION_HAND:
 				case LOCATION_MZONE:
-				case LOCATION_SZONE: {
+				case LOCATION_SZONE:
+				case LOCATION_SKILL: { // [skill_zone]
 					if(!clicked_card)
 						break;
 					int command_flag = clicked_card->cmdFlag;
