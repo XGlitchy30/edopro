@@ -127,6 +127,8 @@ public:
 	A(tTarget)
 	A(tChainTarget)
 	A(tLim)
+	A(tDigits)
+	A(tDigitBackground)
 	A(tOT)
 	A(tHand[3])
 	A(tBackGround)

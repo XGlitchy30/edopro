@@ -35,6 +35,12 @@ public:
 	std::vector<ClientCard*> remove[2];
 	std::vector<ClientCard*> extra[2];
 	std::vector<ClientCard*> limbo_temp;
+
+	// temporary cards for chain links whose card the client cannot resolve
+	// (such as a location-0 card not in the Skill Zone, or a Skill Zone that received no HINT_SKILL* hint)
+	// Freed at MSG_CHAIN_END and by Clear()
+	std::vector<ClientCard*> limbo_chain; // [skill-zone]
+
 	std::set<ClientCard*> overlay_cards;
 	std::vector<ClientCard*> summonable_cards;
 	std::vector<ClientCard*> spsummonable_cards;
@@ -81,6 +87,10 @@ public:
 	bool deck_act[2];
 	bool extra_act[2];
 	bool pzone_act[2];
+
+	// Represents whether the card in the Skill Zone has an effect that can be activated
+	bool skill_act[2]; // [skill-zone]
+
 	bool conti_act;
 	bool chain_forced;
 	ChainInfo current_chain;
@@ -93,6 +103,7 @@ public:
 	void Initial(uint8_t player, uint32_t deckc, uint32_t extrac);
 	std::vector<ClientCard*>* GetList(uint8_t location, uint8_t controler);
 	ClientCard* GetCard(uint8_t controler, uint8_t location, size_t sequence, size_t sub_seq = 0);
+	void ReleaseChainReferences(ClientCard* pcard); // [skill-zone]
 	void AddCard(ClientCard* pcard, uint8_t controler, uint8_t location, uint32_t sequence);
 	ClientCard* RemoveCard(uint8_t controler, uint8_t location, uint32_t sequence);
 	void UpdateCard(uint8_t controler, uint8_t location, uint32_t sequence, const uint8_t* data, uint32_t len = 0);
@@ -155,5 +166,6 @@ public:
 }
 
 #define LOCATION_SKILL   0x400
+#define SKILL_ZONE_SEQUENCE	0xff // [skill_zone]
 
 #endif //CLIENT_FIELD_H

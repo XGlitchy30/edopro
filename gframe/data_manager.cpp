@@ -14,6 +14,7 @@
 #if !defined(SQLITE_NOTICE)
 #define SQLITE_NOTICE      27
 #endif
+#include "deck_manager.h"
 #if !defined(SQLITE_WARNING)
 #define SQLITE_WARNING     28
 #endif
@@ -692,7 +693,9 @@ inline bool check_skills(const CardDataC* p1, const CardDataC* p2) {
 	}
 	return is_skill(p2->type);
 }
-static bool card_sorter(const CardDataC* p1, const CardDataC* p2, bool(*sortoop)(const CardDataC* p1, const CardDataC* p2)) {
+
+template <typename Sorter>
+static bool card_sorter(const CardDataC* p1, const CardDataC* p2, Sorter sortoop) {
 	if(check_either_skills(p1->type, p2->type))
 		return check_skills(p1, p2);
 	if((p1->type & monster_spell_trap) != (p2->type & monster_spell_trap))
@@ -704,6 +707,7 @@ static bool card_sorter(const CardDataC* p1, const CardDataC* p2, bool(*sortoop)
 		return (p1->type & not_monster_spell_trap) < (p2->type & not_monster_spell_trap);
 	return check_codes(p1, p2);
 }
+
 inline uint32_t get_monster_card_type(uint32_t type) {
 	if(type & spsummon_proc_types)
 		return type & (spsummon_proc_types | TYPE_MONSTER);
@@ -758,6 +762,36 @@ bool DataManager::deck_sort_name(const CardDataC* p1, const CardDataC* p2) {
 	int res = gDataManager->GetUppercaseName(p1->code).compare(gDataManager->GetUppercaseName(p2->code));
 	if(res != 0)
 		return res < 0;
+	return check_codes(p1, p2);
+}
+/**
+* @brief Genesys Points sorting logic
+**/
+bool DataManager::deck_sort_genesys(const CardDataC* p1, const CardDataC* p2, const LFList* filterList) {
+	uint16_t gp1 = filterList->GetGenesysPointsOfCard(p1);
+	uint16_t gp2 = filterList->GetGenesysPointsOfCard(p2);
+	if (gp1 != gp2)
+		// First compare Genesys Points
+		return gp1 > gp2;
+	if ((p1->type & monster_spell_trap) != (p2->type & monster_spell_trap))
+		// If GP are equal, monsters come first, then Spells and lastly Traps
+		return (p1->type & monster_spell_trap) < (p2->type & monster_spell_trap);
+
+	if ((p1->type & monster_spell_trap) == TYPE_MONSTER && (p2->type & monster_spell_trap) == TYPE_MONSTER) {
+		// Apply same sorting logic as deck_sort_lv if both are monsters
+		uint32_t type1 = get_monster_card_type(p1->type);
+		uint32_t type2 = get_monster_card_type(p2->type);
+		if (type1 != type2)
+			return type1 < type2;
+		if (p1->level != p2->level)
+			return p1->level > p2->level;
+		if (p1->attack != p2->attack)
+			return p1->attack > p2->attack;
+		if (p1->defense != p2->defense)
+			return p1->defense > p2->defense;
+	}
+
+	// Lastly, check codes
 	return check_codes(p1, p2);
 }
 bool DataManager::deck_sort_passcode_descending(const CardDataC* p1, const CardDataC* p2) {

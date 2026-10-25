@@ -534,6 +534,7 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 			}
 			case BUTTON_DECK_EDIT: {
 				mainGame->RefreshDeck(mainGame->cbDBDecks);
+				mainGame->ReloadCBSortType();
 				if(open_file && mainGame->deckBuilder.SetCurrentDeckFromFile(open_file_name, true)) {
 					auto name = Utils::GetFileName(open_file_name);
 					mainGame->ebDeckname->setText(Utils::ToUnicodeIfNeeded(name).data());
